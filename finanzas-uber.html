@@ -175,6 +175,25 @@ tr.d3{background:rgba(248,113,113,.04)}
 @media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:fixed;left:0;top:0;width:100%;background:#fff;padding:40px 60px;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.9;color:#000}}
 #printArea{display:none}
 .contract-preview{background:#fff;color:#111;padding:28px 32px;border-radius:8px;font-family:'Times New Roman',serif;font-size:13px;line-height:1.9;white-space:pre-wrap;max-height:52vh;overflow-y:auto;border:1px solid #ccc}
+/* INAC PANEL */
+.inac-panel{background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.3);border-radius:9px;padding:14px 16px;margin-bottom:14px}
+.inac-panel .ipt{font-size:10px;font-family:var(--mo);color:var(--bl);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+.inac-resumen{background:var(--sur2);border:1px solid var(--bor2);border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;gap:16px;flex-wrap:wrap}
+/* REP PROVEEDOR PANEL */
+.rep-panel{background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:14px 16px;margin-bottom:14px}
+.rep-panel .rpt{font-size:10px;font-family:var(--mo);color:var(--ye);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+/* PURPLE BADGE */
+.bpu{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.3)}
+/* PERIOD TABS */
+.ptabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px}
+.ptab{padding:5px 10px;border-radius:5px;font-size:11px;font-family:var(--mo);cursor:pointer;border:1px solid var(--bor2);color:var(--tx2);transition:all .15s;user-select:none}
+.ptab.on{background:var(--grd);color:var(--gr);border-color:var(--grb)}
+/* SALDO CHART */
+.chart-wrap{position:relative;width:100%}
+.chart-wrap canvas{display:block}
+.chart-tip{position:absolute;background:var(--sur2);border:1px solid var(--bor2);border-radius:7px;padding:6px 10px;font-size:12px;pointer-events:none;display:none;z-index:10;white-space:nowrap}
+/* INAC MINI STAT */
+.imini{display:flex;flex-direction:column;gap:2px}.imini .il{font-size:9px;font-family:var(--mo);color:var(--tx3);text-transform:uppercase;letter-spacing:.6px}.imini .iv{font-family:var(--mo);font-size:14px;font-weight:600}
 </style>
 </head>
 <body>
@@ -189,11 +208,13 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="ni" data-pg="bitacora">≡ &nbsp;Bitácora Global</div>
   <div class="ni" data-pg="autos">◎ &nbsp;Mis Autos</div>
   <div class="ni" data-pg="choferes">👤 &nbsp;Choferes</div>
+  <div class="ni" data-pg="talleres">🔧 &nbsp;Talleres/Proveedores</div>
   <div class="ns">Reportes</div>
   <div class="ni" data-pg="semanal">▤ &nbsp;Resumen Semanal</div>
   <div class="ni" data-pg="mensual">▦ &nbsp;Resumen Mensual</div>
   <div class="ns">Análisis</div>
   <div class="ni" data-pg="analisis">◆ &nbsp;Análisis</div>
+  <div class="ni" data-pg="saldo">📈 &nbsp;Saldo Flota</div>
   <div class="ns">Sistema</div>
   <div class="ni" id="btnExport">↓ &nbsp;Exportar datos</div>
   <div class="ni" id="btnImport">↑ &nbsp;Importar datos</div>
@@ -234,6 +255,7 @@ tr.d3{background:rgba(248,113,113,.04)}
           <option value="GPS">GPS</option>
           <option value="Seguro">Seguro</option>
           <option value="Inactividad">Inactividad</option>
+          <option value="Administración">Administración</option>
           <option value="Utilidad">Utilidad / Retiro</option>
           <option value="Otro">Otro</option>
         </select>
@@ -272,6 +294,26 @@ tr.d3{background:rgba(248,113,113,.04)}
         <input type="checkbox" id="mvParcial" style="width:auto;cursor:pointer"> Pago parcial (falta completar)
       </label>
     </div>
+    <!-- INACTIVIDAD PANEL -->
+    <div id="inacPanel" class="inac-panel" style="display:none">
+      <div class="ipt">⬤ Cálculo de inactividad</div>
+      <div class="fg">
+        <div class="fo"><label>Fecha y hora de ingreso al taller *</label><input type="datetime-local" id="inacIni"></div>
+        <div class="fo"><label>Horas de holgura (ingreso)</label><input type="number" id="inacHolgIni" value="1" min="0" step="0.5"></div>
+        <div class="fo"><label>Fecha y hora de salida del taller *</label><input type="datetime-local" id="inacFin"></div>
+        <div class="fo"><label>Horas de holgura (salida)</label><input type="number" id="inacHolgFin" value="0" min="0" step="0.5"></div>
+      </div>
+      <div id="inacResumen" class="inac-resumen" style="display:none"></div>
+    </div>
+    <!-- REPARACIONES PROVEEDOR PANEL -->
+    <div id="repPanel" class="rep-panel" style="display:none">
+      <div class="rpt">⬤ Proveedor y ID de reparación</div>
+      <div class="fg">
+        <div class="fo"><label>Proveedor / Taller</label><select id="repProveedor"><option value="">— Sin proveedor —</option></select></div>
+        <div class="fo"><label>ID de reparación</label><input type="text" id="repId" placeholder="Se genera automáticamente" style="font-family:var(--mo)"></div>
+      </div>
+      <div id="repIdInfo" style="font-size:11px;color:var(--tx3);margin-top:4px;display:none"></div>
+    </div>
     <div id="completarPanel" class="ppanel" style="display:none"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
       <button class="btn bp" id="btnGuardarMov">＋ Guardar movimiento</button>
@@ -301,6 +343,7 @@ tr.d3{background:rgba(248,113,113,.04)}
       <option value="Abonos">Abonos</option><option value="Reparaciones">Reparaciones</option>
       <option value="Reinversión">Reinversión</option><option value="GPS">GPS</option>
       <option value="Seguro">Seguro</option><option value="Inactividad">Inactividad</option>
+      <option value="Administración">Administración</option>
       <option value="Utilidad">Utilidad</option><option value="Otro">Otro</option>
     </select>
     <select id="fTipo"><option value="">Ingresos y egresos</option><option value="i">Solo ingresos</option><option value="e">Solo egresos</option></select>
@@ -425,6 +468,62 @@ tr.d3{background:rgba(248,113,113,.04)}
   </div>
 </div>
 
+<!-- TALLERES / PROVEEDORES -->
+<div id="pg-talleres" class="pg">
+  <div class="fb m16">
+    <div><div class="pt">Talleres y Proveedores</div><div class="ps" style="margin:0">Gestiona proveedores y base de datos de reparaciones.</div></div>
+    <button class="btn bp" id="btnNuevoTaller">＋ Agregar proveedor</button>
+  </div>
+  <div class="subtabs">
+    <div class="stab on" data-tallertab="proveedores" id="stabProveedores">Proveedores</div>
+    <div class="stab" data-tallertab="reparaciones" id="stabRepBD">Base de reparaciones</div>
+  </div>
+  <div id="gridTalleres" class="cg"></div>
+  <div id="secRepBD" style="display:none">
+    <div class="card">
+      <div class="ct">Buscar en base de datos de reparaciones</div>
+      <div class="fb2" style="margin-bottom:14px">
+        <input type="text" id="repSearch" placeholder="Buscar por concepto, ID, tipo..." style="flex:2;min-width:200px;max-width:none">
+        <select id="repSearchAuto" style="min-width:160px"><option value="">Todos los autos</option></select>
+        <select id="repSearchTaller" style="min-width:180px"><option value="">Todos los proveedores</option></select>
+        <button class="btn bg sm" id="btnLimpiarRepSearch">✕ Limpiar</button>
+      </div>
+      <div class="tw"><table class="stbl">
+        <thead><tr><th>ID</th><th>Auto</th><th>Proveedor</th><th>Concepto</th><th>Tipo</th><th>Fecha</th><th>Monto</th></tr></thead>
+        <tbody id="tRepBD"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- SALDO FLOTA -->
+<div id="pg-saldo" class="pg">
+  <div class="pt">Saldo de la flota</div>
+  <div class="ps">Evolución del saldo total acumulado de la flotilla.</div>
+  <div class="card">
+    <div class="ptabs" id="saldoPeriodTabs">
+      <div class="ptab" data-period="1D">1D</div>
+      <div class="ptab" data-period="1S">1S</div>
+      <div class="ptab" data-period="15D">15D</div>
+      <div class="ptab" data-period="1M">1M</div>
+      <div class="ptab" data-period="3M">3M</div>
+      <div class="ptab" data-period="6M">6M</div>
+      <div class="ptab" data-period="YTD">YTD</div>
+      <div class="ptab" data-period="1Y">1Y</div>
+      <div class="ptab" data-period="2Y">2Y</div>
+      <div class="ptab on" data-period="ALL">ALL</div>
+    </div>
+    <div class="sr" id="saldoStats" style="margin-bottom:14px"></div>
+    <div class="chart-wrap">
+      <canvas id="saldoChart"></canvas>
+      <div class="chart-tip" id="saldoTip"></div>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--tx3)">
+      <span><span style="display:inline-block;width:14px;height:3px;background:var(--gr);margin-right:5px;vertical-align:middle;border-radius:2px"></span>Saldo total flota</span>
+    </div>
+  </div>
+</div>
+
 <!-- ANÁLISIS -->
 <div id="pg-analisis" class="pg">
   <div class="pt">Análisis</div>
@@ -530,6 +629,7 @@ tr.d3{background:rgba(248,113,113,.04)}
       <div class="fo"><label>Placas *</label><input type="text" id="aPlacas" placeholder="UPA-536-C"></div>
       <div class="fo"><label>Renta semanal ($) *</label><input type="number" id="aRenta" placeholder="2200"></div>
       <div class="fo"><label>Color</label><input type="text" id="aColor" placeholder="Blanco, Gris..."></div>
+      <div class="fo"><label>Año del auto</label><input type="number" id="aAnio" placeholder="2018" min="1990" max="2035"></div>
       <div class="fo"><label>Número de serie</label><input type="text" id="aSerie" placeholder="3VWFE21C04M000000"></div>
       <div class="fo"><label>Estado</label><select id="aEstado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
       <div class="fo"><label>Costo adquisición ($)</label><input type="number" id="aCostoAdq" placeholder="120000"></div>
@@ -632,6 +732,28 @@ tr.d3{background:rgba(248,113,113,.04)}
   </div>
 </div>
 
+<!-- MODAL TALLER -->
+<div class="mb" id="modalTaller">
+  <div class="md">
+    <div class="mt" id="modalTallerTit">Agregar proveedor</div>
+    <div class="fg">
+      <div class="fo"><label>Primer nombre *</label><input type="text" id="tNombre1" placeholder="Automotriz"></div>
+      <div class="fo"><label>Segundo nombre *</label><input type="text" id="tNombre2" placeholder="Libra"></div>
+      <div class="fo full"><label>Nombre completo para mostrar (opcional)</label><input type="text" id="tNombreCompleto" placeholder="Se genera de los dos nombres si se deja vacío"></div>
+      <div class="fo"><label>Teléfono</label><input type="text" id="tTel" placeholder="55 1234 5678"></div>
+      <div class="fo"><label>Ubicación</label><input type="text" id="tUbicacion" placeholder="Calle, colonia, ciudad"></div>
+      <div class="fo full"><label>Notas / especialidad</label><input type="text" id="tNotas" placeholder="Ej: Especialistas en suspensión"></div>
+    </div>
+    <div style="font-size:11px;color:var(--tx3);margin-bottom:12px;padding:8px 12px;background:var(--sur2);border-radius:7px">
+      Las <strong>iniciales del proveedor</strong> se generan del primer carácter de cada nombre y se usan en los IDs de reparación. Ej: <strong style="color:var(--ye)">Automotriz + Libra → AL</strong>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn bg" id="btnCancelTaller">Cancelar</button>
+      <button class="btn bp" id="btnOkTaller">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONFIRMAR -->
 <div class="mb" id="modalConfirm">
   <div class="md" style="max-width:380px;text-align:center">
@@ -671,13 +793,14 @@ let PERIODOS   = S.get('ff_per',[]);
 let INACTIVIDAD= S.get('ff_inac',[]);
 let CONTRATOS  = S.get('ff_contratos',[]);
 let DOCS       = S.get('ff_docs',[]);
+let TALLERES   = S.get('ff_talleres',[]);
 
 function save(){
   S.set('ff_autos',AUTOS);S.set('ff_movs',MOVS);
   S.set('ff_choferes',CHOFERES);S.set('ff_per',PERIODOS);
   S.set('ff_inac',INACTIVIDAD);
   S.set('ff_contratos',CONTRATOS);
-  S.set('ff_docs',DOCS);
+  S.set('ff_talleres',TALLERES);
   syncToCloud();
 }
 
@@ -706,6 +829,7 @@ function _applyCloudData(d){
   if(d.INACTIVIDAD){INACTIVIDAD=d.INACTIVIDAD;S.set('ff_inac',INACTIVIDAD);}
   if(d.CONTRATOS){CONTRATOS=d.CONTRATOS;S.set('ff_contratos',CONTRATOS);}
   if(d.DOCS){DOCS=d.DOCS;S.set('ff_docs',DOCS);}
+  if(d.TALLERES){TALLERES=d.TALLERES;S.set('ff_talleres',TALLERES);}
 }
 
 function _markSynced(){
@@ -747,6 +871,8 @@ function renderCurrentPage(){
   else if(id==='semanal')renderSemanal();
   else if(id==='mensual')renderMensual();
   else if(id==='analisis')renderAnalisis();
+  else if(id==='talleres')renderTalleres();
+  else if(id==='saldo')renderSaldo();
 }
 
 async function loadFromCloud(){
@@ -768,7 +894,7 @@ function syncToCloud(force=false){
     setCloudDot('syncing');
     try{
       const ts=Date.now();
-      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,_ts:ts});
+      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
     }catch(e){console.error('syncToCloud:',e);setCloudDot('error');}
@@ -854,7 +980,7 @@ function getChoferEnFecha(autoId,fecha){
 }
 
 function catBadge(cat){
-  const m={Abonos:'bg2',Reparaciones:'br',Reinversión:'by',GPS:'bb',Seguro:'bb',Inactividad:'bgr',Utilidad:'bg2',Otro:'bgr'};
+  const m={Abonos:'bg2',Reparaciones:'br',Reinversión:'by',GPS:'bb',Seguro:'bb',Inactividad:'bgr',Administración:'bpu',Utilidad:'bg2',Otro:'bgr'};
   return`<span class="b ${m[cat]||'bgr'}">${cat}</span>`;
 }
 function delBadge(d){
@@ -885,9 +1011,11 @@ function goTo(pg){
   if(pg==='bitacora')renderBitacora();
   if(pg==='autos')renderAutos();
   if(pg==='choferes')renderChoferes();
+  if(pg==='talleres')renderTalleres();
   if(pg==='semanal')renderSemanal();
   if(pg==='mensual')renderMensual();
   if(pg==='analisis')renderAnalisis();
+  if(pg==='saldo')renderSaldo();
 }
 
 document.querySelectorAll('.ni[data-pg]').forEach(el=>{
@@ -1083,8 +1211,12 @@ function initMov(){
   document.getElementById('mvMonto').value='';
   document.getElementById('mvNota').value='';
   document.getElementById('abonoPanel').style.display='none';
+  document.getElementById('inacPanel').style.display='none';
+  document.getElementById('repPanel').style.display='none';
   document.getElementById('completarPanel').style.display='none';
   document.getElementById('completarPanel').innerHTML='';
+  document.getElementById('inacResumen').style.display='none';
+  document.getElementById('inacResumen').innerHTML='';
   document.getElementById('mvParcial').checked=false;
   _completarParcialId=null;
   setDelay(0);
@@ -1105,6 +1237,10 @@ document.getElementById('mvCat').addEventListener('change',function(){
   const cat=this.value;
   const panel=document.getElementById('abonoPanel');
   document.getElementById('foTipoRep').style.display=cat==='Reparaciones'?'flex':'none';
+  document.getElementById('repPanel').style.display=cat==='Reparaciones'?'block':'none';
+  document.getElementById('inacPanel').style.display=cat==='Inactividad'?'block':'none';
+  if(cat==='Reparaciones') updateRepPanel();
+  if(cat==='Inactividad') calcInac();
   if(cat==='Abonos'){
     panel.style.display='block';
     const autoId=document.getElementById('mvAuto').value;
@@ -1121,12 +1257,15 @@ document.getElementById('mvCat').addEventListener('change',function(){
 });
 
 document.getElementById('mvAuto').addEventListener('change',function(){
-  if(document.getElementById('mvCat').value==='Abonos'){
+  const cat=document.getElementById('mvCat').value;
+  if(cat==='Abonos'){
     const p=getPeriodoActivo(this.value);
     document.getElementById('mvChoferAbono').innerHTML='<option value="">— Sin asignar —</option>'+
       CHOFERES.map(c=>`<option value="${c.id}"${p&&p.choferId===c.id?' selected':''}>${c.nombre}</option>`).join('');
     updateCompletarPanel();
   }
+  if(cat==='Reparaciones') updateRepPanel();
+  if(cat==='Inactividad') calcInac();
 });
 
 document.getElementById('mvFecha').addEventListener('change',()=>{
@@ -1159,6 +1298,19 @@ document.getElementById('btnGuardarMov').addEventListener('click',()=>{
   }
   if(categoria==='Reparaciones'){
     mov.tipoRep=document.getElementById('mvTipoRep').value;
+    const provId=document.getElementById('repProveedor').value;
+    if(provId){mov.proveedorId=provId;mov.repId=document.getElementById('repId').value.trim()||undefined;}
+  }
+  if(categoria==='Inactividad'){
+    const iniVal=document.getElementById('inacIni').value;
+    const finVal=document.getElementById('inacFin').value;
+    if(iniVal&&finVal){
+      mov.inacIni=iniVal;mov.inacFin=finVal;
+      mov.inacHolgIni=parseFloat(document.getElementById('inacHolgIni').value)||0;
+      mov.inacHolgFin=parseFloat(document.getElementById('inacHolgFin').value)||0;
+      const hrs=(new Date(finVal)-new Date(iniVal))/3600000+mov.inacHolgIni+mov.inacHolgFin;
+      mov.inacHorasTotales=parseFloat(hrs.toFixed(2));
+    }
   }
   MOVS.push(mov);save();
   toast(`✓ Guardado. Saldo ${getAuto(autoId).nombre}: ${fmt(getSaldo(autoId))}`);
@@ -1376,8 +1528,8 @@ let _editAutoId=null;
 function abrirModalAuto(id){
   _editAutoId=id||null;
   document.getElementById('modalAutoTit').textContent=id?'Editar auto':'Agregar auto';
-  if(id){const a=getAuto(id);document.getElementById('aNombre').value=a.nombre;document.getElementById('aPlacas').value=a.placas;document.getElementById('aRenta').value=a.renta;document.getElementById('aColor').value=a.color||'';document.getElementById('aSerie').value=a.serie||'';document.getElementById('aEstado').value=a.estado;document.getElementById('aCostoAdq').value=a.costoAdq||'';document.getElementById('aGps').value=a.gps||'';document.getElementById('aSeguro').value=a.seguro||'';document.getElementById('aReservaRep').value=a.reservaRep||'';}
-  else{['aNombre','aPlacas','aRenta','aColor','aSerie','aCostoAdq','aGps','aSeguro','aReservaRep'].forEach(i=>document.getElementById(i).value='');document.getElementById('aEstado').value='activo';}
+  if(id){const a=getAuto(id);document.getElementById('aNombre').value=a.nombre;document.getElementById('aPlacas').value=a.placas;document.getElementById('aRenta').value=a.renta;document.getElementById('aColor').value=a.color||'';document.getElementById('aAnio').value=a.año||'';document.getElementById('aSerie').value=a.serie||'';document.getElementById('aEstado').value=a.estado;document.getElementById('aCostoAdq').value=a.costoAdq||'';document.getElementById('aGps').value=a.gps||'';document.getElementById('aSeguro').value=a.seguro||'';document.getElementById('aReservaRep').value=a.reservaRep||'';}
+  else{['aNombre','aPlacas','aRenta','aColor','aAnio','aSerie','aCostoAdq','aGps','aSeguro','aReservaRep'].forEach(i=>document.getElementById(i).value='');document.getElementById('aEstado').value='activo';}
   document.getElementById('modalAuto').classList.add('on');
 }
 document.getElementById('btnNuevoAuto').addEventListener('click',()=>abrirModalAuto());
@@ -1388,6 +1540,7 @@ document.getElementById('btnOkAuto').addEventListener('click',()=>{
   const placas=document.getElementById('aPlacas').value.trim();
   const renta=parseFloat(document.getElementById('aRenta').value);
   const color=document.getElementById('aColor').value.trim();
+  const año=parseInt(document.getElementById('aAnio').value)||0;
   const serie=document.getElementById('aSerie').value.trim();
   const estado=document.getElementById('aEstado').value;
   const costoAdq=parseFloat(document.getElementById('aCostoAdq').value)||0;
@@ -1397,8 +1550,8 @@ document.getElementById('btnOkAuto').addEventListener('click',()=>{
   if(!nombre)return toast('Nombre requerido','er');
   if(!placas)return toast('Placas requeridas','er');
   if(isNaN(renta))return toast('Ingresa la renta','er');
-  if(_editAutoId){const i=AUTOS.findIndex(a=>a.id===_editAutoId);AUTOS[i]={...AUTOS[i],nombre,placas,renta,color,serie,estado,costoAdq,gps,seguro,reservaRep};}
-  else AUTOS.push({id:uid(),nombre,placas,renta,color,serie,estado,costoAdq,gps,seguro,reservaRep});
+  if(_editAutoId){const i=AUTOS.findIndex(a=>a.id===_editAutoId);AUTOS[i]={...AUTOS[i],nombre,placas,renta,color,año,serie,estado,costoAdq,gps,seguro,reservaRep};}
+  else AUTOS.push({id:uid(),nombre,placas,renta,color,año,serie,estado,costoAdq,gps,seguro,reservaRep});
   save();document.getElementById('modalAuto').classList.remove('on');renderAutos();toast(_editAutoId?'Auto actualizado':'Auto agregado ✓');
 });
 
@@ -2078,7 +2231,7 @@ function renderDocsChofer(choferId){
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════
 document.getElementById('btnExport').addEventListener('click',()=>{
-  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,exportado:new Date().toISOString()},null,2);
+  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,exportado:new Date().toISOString()},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download=`flota-finanzas-${today()}.json`;a.click();
@@ -2096,9 +2249,9 @@ document.getElementById('importFile').addEventListener('change',function(){
       const A=d.AUTOS||d.autos||[];const M=d.MOVS||d.movimientos||[];
       const C=d.CHOFERES||d.choferes||[];const P=d.PERIODOS||d.periodos||[];
       const I=d.INACTIVIDAD||d.inactividad||[];
-      const CT=d.CONTRATOS||[];const DC=d.DOCS||[];
+      const CT=d.CONTRATOS||[];const DC=d.DOCS||[];const TL=d.TALLERES||[];
       if(!await confirmar(`Importar ${A.length} autos, ${M.length} movimientos y ${C.length} choferes?`,'Importar','bp'))return;
-      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;
+      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;
       save();renderDash();toast('✓ Datos importados');
     }catch{toast('Archivo no válido','er');}
   };
@@ -2144,6 +2297,396 @@ document.getElementById('btnSyncNow').addEventListener('click',()=>syncToCloud(t
   const savedTs=S.get('ff_last_sync',null);
   if(savedTs){const el=document.getElementById('lastSyncTime');if(el)el.textContent='Última sync: '+savedTs;}
 })();
+
+// INACTIVIDAD PANEL — cálculo en tiempo real
+// ═══════════════════════════════════════════════════════════
+function calcInac(){
+  const iniVal=document.getElementById('inacIni').value;
+  const finVal=document.getElementById('inacFin').value;
+  const holgIni=parseFloat(document.getElementById('inacHolgIni').value)||0;
+  const holgFin=parseFloat(document.getElementById('inacHolgFin').value)||0;
+  const resumen=document.getElementById('inacResumen');
+  if(!iniVal||!finVal){resumen.style.display='none';return;}
+  const ini=new Date(iniVal),fin=new Date(finVal);
+  if(fin<=ini){
+    resumen.style.display='block';
+    resumen.innerHTML='<span style="color:var(--re)">⚠ La salida debe ser posterior al ingreso.</span>';
+    return;
+  }
+  const diffHrs=(fin-ini)/3600000;
+  const totalHrs=diffHrs+holgIni+holgFin;
+  const autoId=document.getElementById('mvAuto').value;
+  const auto=autoId&&autoId!=='__general__'?getAuto(autoId):null;
+  const pph=auto?(auto.renta/7/24):0;
+  const costo=pph*totalHrs;
+  resumen.style.display='flex';
+  resumen.innerHTML=`
+    <div class="imini"><div class="il">Diferencia</div><div class="iv">${diffHrs.toFixed(2)} h</div></div>
+    <div class="imini"><div class="il">+ Holguras</div><div class="iv">${(holgIni+holgFin).toFixed(1)} h</div></div>
+    <div class="imini"><div class="il">Total inactividad</div><div class="iv" style="color:var(--bl)">${totalHrs.toFixed(2)} h</div></div>
+    ${auto?`<div class="imini"><div class="il">Precio/hora</div><div class="iv">${fmt(pph)}</div></div>
+    <div class="imini"><div class="il">Costo inactividad</div><div class="iv" style="color:var(--re)">${fmt(-costo)}</div></div>`:''}`;
+  if(auto){
+    document.getElementById('mvMonto').value=(-costo).toFixed(2);
+    if(!document.getElementById('mvConcepto').value)
+      document.getElementById('mvConcepto').value=`Inactividad taller: ${totalHrs.toFixed(1)} hrs`;
+  }
+}
+['inacIni','inacFin','inacHolgIni','inacHolgFin'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',calcInac);
+});
+
+// ═══════════════════════════════════════════════════════════
+// REPARACIONES — PROVEEDOR PANEL
+// ═══════════════════════════════════════════════════════════
+const getTaller=id=>TALLERES.find(t=>t.id===id);
+
+function autoPrefix(autoId){
+  const a=getAuto(autoId);if(!a)return'??';
+  const words=a.nombre.trim().split(/\s+/);
+  const p1=words[0]?words[0][0].toUpperCase():'';
+  const p2=words[1]?words[1][0].toUpperCase():'';
+  const yr=a.año?String(a.año).slice(-2):'??';
+  return p1+p2+yr;
+}
+function tallerSufijo(tallerId){
+  const t=getTaller(tallerId);if(!t)return'??';
+  return((t.nombre1||'')[0]||'').toUpperCase()+((t.nombre2||'')[0]||'').toUpperCase();
+}
+function genRepId(autoId,tallerId){
+  const pfx=autoPrefix(autoId);
+  const sfx=tallerSufijo(tallerId);
+  const existentes=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.autoId===autoId&&m.proveedorId===tallerId&&m.repId);
+  const cnt=String(existentes.length+1).padStart(3,'0');
+  return`${pfx}-${cnt}-${sfx}`;
+}
+
+function updateRepPanel(){
+  const autoId=document.getElementById('mvAuto').value;
+  const sel=document.getElementById('repProveedor');
+  sel.innerHTML='<option value="">— Sin proveedor —</option>'+
+    TALLERES.map(t=>`<option value="${t.id}">${t.nombreCompleto||t.nombre1+' '+t.nombre2}</option>`).join('');
+  updateRepId();
+}
+function updateRepId(){
+  const provId=document.getElementById('repProveedor').value;
+  const autoId=document.getElementById('mvAuto').value;
+  const infoEl=document.getElementById('repIdInfo');
+  const idInput=document.getElementById('repId');
+  if(!provId||!autoId||autoId==='__general__'){
+    idInput.value='';infoEl.style.display='none';return;
+  }
+  const repId=genRepId(autoId,provId);
+  idInput.value=repId;
+  infoEl.style.display='block';
+  const auto=getAuto(autoId);const taller=getTaller(provId);
+  const tn=taller?`${taller.nombre1} ${taller.nombre2}`:'?';
+  infoEl.innerHTML=`ID generado: <strong style="color:var(--ye);font-family:var(--mo)">${repId}</strong> · ${auto?auto.nombre:'?'} / ${tn}`;
+}
+document.getElementById('repProveedor').addEventListener('change',updateRepId);
+
+// ═══════════════════════════════════════════════════════════
+// TALLERES / PROVEEDORES
+// ═══════════════════════════════════════════════════════════
+let _tallerTab='proveedores';
+
+function renderTalleres(){
+  document.querySelectorAll('[data-tallertab]').forEach(el=>{
+    el.classList.toggle('on',el.dataset.tallertab===_tallerTab);
+  });
+  const isRep=_tallerTab==='reparaciones';
+  document.getElementById('gridTalleres').style.display=isRep?'none':'grid';
+  document.getElementById('secRepBD').style.display=isRep?'block':'none';
+  if(isRep){renderRepBD();return;}
+  const grid=document.getElementById('gridTalleres');
+  if(!TALLERES.length){
+    grid.innerHTML='<div class="emp" style="grid-column:1/-1"><div style="font-size:32px;margin-bottom:10px">🔧</div><p>Sin proveedores registrados.</p></div>';
+    return;
+  }
+  grid.innerHTML='';
+  TALLERES.forEach(t=>{
+    const nombre=t.nombreCompleto||(t.nombre1+' '+t.nombre2);
+    const iniciales=((t.nombre1||'')[0]||'').toUpperCase()+((t.nombre2||'')[0]||'').toUpperCase();
+    const reps=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.proveedorId===t.id);
+    const totalPagado=reps.reduce((s,m)=>s+Math.abs(Number(m.monto)),0);
+    const div=document.createElement('div');
+    div.className='cc';
+    div.innerHTML=`
+      <div class="fb m4">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--tx)">${nombre}</div>
+          <div style="font-family:var(--mo);font-size:11px;color:var(--tx3)">Iniciales: <strong style="color:var(--ye)">${iniciales}</strong></div>
+        </div>
+      </div>
+      ${t.tel?`<div style="font-size:12px;color:var(--tx3);margin-top:4px">📞 ${t.tel}</div>`:''}
+      ${t.ubicacion?`<div style="font-size:12px;color:var(--tx3)">📍 ${t.ubicacion}</div>`:''}
+      <div style="font-family:var(--mo);font-size:19px;font-weight:600;margin:8px 0;color:var(--re)">${fmt(-totalPagado)}</div>
+      <div style="font-size:12px;color:var(--tx3)">${reps.length} reparación${reps.length!==1?'es':''} registradas</div>
+      ${t.notas?`<div style="font-size:11px;color:var(--tx3);margin-top:4px">${t.notas}</div>`:''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn bg sm btnEditT">Editar</button>
+        <button class="btn bd sm btnDelT">✕</button>
+      </div>`;
+    div.querySelector('.btnEditT').addEventListener('click',()=>abrirModalTaller(t.id));
+    div.querySelector('.btnDelT').addEventListener('click',async()=>{
+      if(!await confirmar(`¿Eliminar "${nombre}"? Las reparaciones registradas no se borrarán.`))return;
+      TALLERES=TALLERES.filter(x=>x.id!==t.id);
+      save();renderTalleres();toast('Proveedor eliminado');
+    });
+    grid.appendChild(div);
+  });
+}
+
+function renderRepBD(){
+  const selAuto=document.getElementById('repSearchAuto');
+  const selTaller=document.getElementById('repSearchTaller');
+  const prevA=selAuto.value,prevT=selTaller.value;
+  selAuto.innerHTML='<option value="">Todos los autos</option>'+
+    AUTOS.map(a=>`<option value="${a.id}"${a.id===prevA?' selected':''}>${a.nombre}</option>`).join('');
+  selTaller.innerHTML='<option value="">Todos los proveedores</option>'+
+    TALLERES.map(t=>`<option value="${t.id}"${t.id===prevT?' selected':''}>${t.nombreCompleto||t.nombre1+' '+t.nombre2}</option>`).join('');
+  let reps=MOVS.filter(m=>m.categoria==='Reparaciones').sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const q=(document.getElementById('repSearch').value||'').toLowerCase().trim();
+  const fA=selAuto.value,fT=selTaller.value;
+  if(q)reps=reps.filter(m=>
+    (m.concepto&&m.concepto.toLowerCase().includes(q))||
+    (m.repId&&m.repId.toLowerCase().includes(q))||
+    (m.tipoRep&&m.tipoRep.toLowerCase().includes(q))||
+    (m.nota&&m.nota.toLowerCase().includes(q))
+  );
+  if(fA)reps=reps.filter(m=>m.autoId===fA);
+  if(fT)reps=reps.filter(m=>m.proveedorId===fT);
+  const tbody=document.getElementById('tRepBD');
+  if(!reps.length){
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">Sin reparaciones${q?' que coincidan':''} registradas.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML='';
+  reps.forEach(m=>{
+    const auto=getAuto(m.autoId);
+    const taller=m.proveedorId?getTaller(m.proveedorId):null;
+    const tn=taller?(taller.nombreCompleto||taller.nombre1+' '+taller.nombre2):'—';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="mo">${m.repId?`<span class="b by" style="font-family:var(--mo);font-size:11px">${m.repId}</span>`:'<span style="color:var(--tx3)">—</span>'}</td>
+      <td style="font-weight:500;color:var(--tx)">${auto?auto.nombre:'—'}</td>
+      <td class="ts tm">${tn}</td>
+      <td>${m.concepto}</td>
+      <td>${m.tipoRep?`<span class="b bgr">${m.tipoRep}</span>`:'—'}</td>
+      <td class="mo">${fdate(m.fecha)}</td>
+      <td class="an">${fmt(m.monto)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.querySelectorAll('[data-tallertab]').forEach(el=>{
+  el.addEventListener('click',()=>{_tallerTab=el.dataset.tallertab;renderTalleres();});
+});
+['repSearch','repSearchAuto','repSearchTaller'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',renderRepBD);
+  document.getElementById(id).addEventListener('change',renderRepBD);
+});
+document.getElementById('btnLimpiarRepSearch').addEventListener('click',()=>{
+  document.getElementById('repSearch').value='';
+  document.getElementById('repSearchAuto').value='';
+  document.getElementById('repSearchTaller').value='';
+  renderRepBD();
+});
+
+// MODAL TALLER
+let _editTallerId=null;
+function abrirModalTaller(id){
+  _editTallerId=id||null;
+  document.getElementById('modalTallerTit').textContent=id?'Editar proveedor':'Agregar proveedor';
+  if(id){
+    const t=getTaller(id);
+    document.getElementById('tNombre1').value=t.nombre1||'';
+    document.getElementById('tNombre2').value=t.nombre2||'';
+    document.getElementById('tNombreCompleto').value=t.nombreCompleto||'';
+    document.getElementById('tTel').value=t.tel||'';
+    document.getElementById('tUbicacion').value=t.ubicacion||'';
+    document.getElementById('tNotas').value=t.notas||'';
+  } else {
+    ['tNombre1','tNombre2','tNombreCompleto','tTel','tUbicacion','tNotas'].forEach(i=>document.getElementById(i).value='');
+  }
+  document.getElementById('modalTaller').classList.add('on');
+}
+document.getElementById('btnNuevoTaller').addEventListener('click',()=>abrirModalTaller());
+document.getElementById('btnCancelTaller').addEventListener('click',()=>document.getElementById('modalTaller').classList.remove('on'));
+document.getElementById('modalTaller').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('on');});
+document.getElementById('btnOkTaller').addEventListener('click',()=>{
+  const nombre1=document.getElementById('tNombre1').value.trim();
+  const nombre2=document.getElementById('tNombre2').value.trim();
+  if(!nombre1)return toast('Primer nombre requerido','er');
+  if(!nombre2)return toast('Segundo nombre requerido','er');
+  const nombreCompleto=document.getElementById('tNombreCompleto').value.trim()||`${nombre1} ${nombre2}`;
+  const tel=document.getElementById('tTel').value.trim();
+  const ubicacion=document.getElementById('tUbicacion').value.trim();
+  const notas=document.getElementById('tNotas').value.trim();
+  if(_editTallerId){
+    const i=TALLERES.findIndex(t=>t.id===_editTallerId);
+    TALLERES[i]={...TALLERES[i],nombre1,nombre2,nombreCompleto,tel,ubicacion,notas};
+  } else {
+    TALLERES.push({id:uid(),nombre1,nombre2,nombreCompleto,tel,ubicacion,notas,_ts:Date.now()});
+  }
+  save();document.getElementById('modalTaller').classList.remove('on');renderTalleres();
+  toast(_editTallerId?'Proveedor actualizado':'Proveedor agregado ✓');
+});
+
+// ═══════════════════════════════════════════════════════════
+// SALDO FLOTA — CHART
+// ═══════════════════════════════════════════════════════════
+let _saldoPeriod='ALL';
+
+function getBalanceTimeline(period){
+  const sorted=[...MOVS].sort((a,b)=>a.fecha.localeCompare(b.fecha)||a._ts-b._ts);
+  if(!sorted.length)return[];
+  let bal=0;
+  const all=sorted.map(m=>({date:new Date(m.fecha+'T12:00:00'),balance:(bal+=Number(m.monto),bal)}));
+  const now=new Date();
+  let start=null;
+  if(period==='1D')start=new Date(now-86400000);
+  else if(period==='1S')start=new Date(now-7*86400000);
+  else if(period==='15D')start=new Date(now-15*86400000);
+  else if(period==='1M'){start=new Date(now);start.setMonth(start.getMonth()-1);}
+  else if(period==='3M'){start=new Date(now);start.setMonth(start.getMonth()-3);}
+  else if(period==='6M'){start=new Date(now);start.setMonth(start.getMonth()-6);}
+  else if(period==='YTD')start=new Date(now.getFullYear(),0,1);
+  else if(period==='1Y'){start=new Date(now);start.setFullYear(start.getFullYear()-1);}
+  else if(period==='2Y'){start=new Date(now);start.setFullYear(start.getFullYear()-2);}
+  if(!start)return all;
+  const before=all.filter(p=>p.date<start);
+  const startBal=before.length?before[before.length-1].balance:0;
+  const filtered=all.filter(p=>p.date>=start);
+  if(!filtered.length||filtered[0].date>start)filtered.unshift({date:start,balance:startBal});
+  return filtered;
+}
+
+function drawSaldoChart(){
+  const canvas=document.getElementById('saldoChart');
+  if(!canvas)return;
+  const container=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  const W=container.clientWidth||800;
+  const H=300;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const points=getBalanceTimeline(_saldoPeriod);
+  const pad={top:20,right:20,bottom:36,left:76};
+  const cW=W-pad.left-pad.right,cH=H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+  if(!points.length){
+    ctx.fillStyle='rgba(139,144,160,0.4)';ctx.font='14px "Sora",sans-serif';ctx.textAlign='center';
+    ctx.fillText('Sin movimientos registrados',W/2,H/2);
+    document.getElementById('saldoStats').innerHTML='';return;
+  }
+  const vals=points.map(p=>p.balance);
+  let minV=Math.min(...vals),maxV=Math.max(...vals);
+  const pad2=(maxV-minV)*0.08||Math.abs(maxV)*0.08||500;
+  minV-=pad2;maxV+=pad2;
+  const range=maxV-minV;
+  const n=points.length;
+  const toX=i=>pad.left+(i/(n-1||1))*cW;
+  const toY=v=>pad.top+cH-((v-minV)/range)*cH;
+  // Grid
+  const gLines=5;
+  ctx.lineWidth=1;
+  for(let i=0;i<=gLines;i++){
+    const y=pad.top+(cH/gLines)*i;
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cW,y);ctx.stroke();
+  }
+  // Zero line
+  if(minV<0&&maxV>0){
+    const y0=toY(0);
+    ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.setLineDash([5,5]);
+    ctx.beginPath();ctx.moveTo(pad.left,y0);ctx.lineTo(pad.left+cW,y0);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='9px "DM Mono",monospace';ctx.textAlign='right';
+    ctx.fillText('0',pad.left-4,y0+4);
+  }
+  const lastBal=vals[vals.length-1];
+  const lineColor=lastBal>=0?'#4ade80':'#f87171';
+  const gradTop=lastBal>=0?'rgba(74,222,128,0.22)':'rgba(248,113,113,0.22)';
+  // Gradient fill
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
+  grad.addColorStop(0,gradTop);grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(p.balance);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.lineTo(toX(n-1),pad.top+cH);ctx.lineTo(toX(0),pad.top+cH);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  // Line
+  ctx.beginPath();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(p.balance);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle=lineColor;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
+  // Y-axis labels
+  ctx.fillStyle='rgba(139,144,160,0.85)';ctx.font='10px "DM Mono",monospace';ctx.textAlign='right';
+  for(let i=0;i<=gLines;i++){
+    const v=maxV-(range/gLines)*i;
+    const y=pad.top+(cH/gLines)*i;
+    const label=Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':Math.round(v).toString();
+    ctx.fillText(label,pad.left-5,y+4);
+  }
+  // X-axis labels
+  ctx.textAlign='center';
+  const maxLabels=Math.min(7,n);
+  const step=Math.max(1,Math.floor(n/maxLabels));
+  for(let i=0;i<n;i+=step){
+    const d=points[i].date;
+    ctx.fillText(`${d.getDate()}/${d.getMonth()+1}`,toX(i),H-8);
+  }
+  // Stats
+  const startBal=vals[0];
+  const change=lastBal-startBal;
+  const changePct=startBal!==0?(change/Math.abs(startBal)*100).toFixed(1):'—';
+  document.getElementById('saldoStats').innerHTML=`
+    <div class="sc"><div class="sl">Saldo actual</div><div class="sv ${lastBal>=0?'g':'r'}">${fmt(lastBal)}</div></div>
+    <div class="sc"><div class="sl">Inicio período</div><div class="sv">${fmt(startBal)}</div></div>
+    <div class="sc"><div class="sl">Cambio</div><div class="sv ${change>=0?'g':'r'}">${change>=0?'+':''}${fmt(change)}</div></div>
+    <div class="sc"><div class="sl">Variación</div><div class="sv ${change>=0?'g':'r'}">${change>=0?'+':''}${changePct==='—'?'—':changePct+'%'}</div></div>`;
+}
+
+function initSaldoTooltip(){
+  const canvas=document.getElementById('saldoChart');
+  const tip=document.getElementById('saldoTip');
+  if(!canvas||canvas._ttBound)return;
+  canvas._ttBound=true;
+  canvas.addEventListener('mousemove',e=>{
+    const rect=canvas.getBoundingClientRect();
+    const points=getBalanceTimeline(_saldoPeriod);
+    if(!points.length){tip.style.display='none';return;}
+    const W=rect.width;
+    const padL=76,padR=20,padT=20,padB=36;
+    const cW=W-padL-padR;
+    const mx=e.clientX-rect.left;
+    if(mx<padL||mx>padL+cW){tip.style.display='none';return;}
+    const idx=Math.round(((mx-padL)/cW)*(points.length-1));
+    const p=points[Math.max(0,Math.min(idx,points.length-1))];
+    const d=p.date;
+    const ds=`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+    tip.innerHTML=`<div style="font-family:var(--mo);font-size:10px;color:var(--tx3)">${ds}</div>
+      <div style="font-family:var(--mo);font-size:14px;font-weight:600;color:${p.balance>=0?'var(--gr)':'var(--re)'}">${fmt(p.balance)}</div>`;
+    tip.style.display='block';
+    const tipL=Math.min(mx+14,rect.width-130);
+    const tipT=Math.max(4,(e.clientY-rect.top)-44);
+    tip.style.left=tipL+'px';tip.style.top=tipT+'px';
+  });
+  canvas.addEventListener('mouseleave',()=>{tip.style.display='none';});
+}
+
+function renderSaldo(){
+  drawSaldoChart();
+  initSaldoTooltip();
+}
+
+document.querySelectorAll('.ptab').forEach(el=>{
+  el.addEventListener('click',()=>{
+    _saldoPeriod=el.dataset.period;
+    document.querySelectorAll('.ptab').forEach(t=>t.classList.toggle('on',t.dataset.period===_saldoPeriod));
+    drawSaldoChart();
+  });
+});
 
 // ═══════════════════════════════════════════════════════════
 // INIT
