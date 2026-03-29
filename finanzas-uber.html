@@ -2956,7 +2956,7 @@ function cerrarEditMov(){
   document.getElementById('editMovModal').style.display='none';
   _editMovId=null;
 }
-document.getElementById('btnGuardarEditMov').addEventListener('click',()=>{
+function guardarEditMov(){
   if(!_editMovId)return;
   const idx=MOVS.findIndex(x=>x.id===_editMovId);
   if(idx<0)return;
@@ -2980,7 +2980,7 @@ document.getElementById('btnGuardarEditMov').addEventListener('click',()=>{
     if(repId)MOVS[idx].repId=repId; else delete MOVS[idx].repId;
   }
   save();cerrarEditMov();renderBitacora();toast('✓ Movimiento actualizado');
-});
+}
 </script>
 <div id="printArea"></div>
 <!-- MODAL EDITAR MOVIMIENTO -->
@@ -3032,7 +3032,7 @@ document.getElementById('btnGuardarEditMov').addEventListener('click',()=>{
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn bp" id="btnGuardarEditMov">✓ Guardar cambios</button>
+      <button class="btn bp" onclick="guardarEditMov()">✓ Guardar cambios</button>
       <button class="btn bg" onclick="cerrarEditMov()">Cancelar</button>
     </div>
   </div>
