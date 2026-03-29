@@ -2323,7 +2323,7 @@ function updateRepConceptoList(){
   const tipo=document.getElementById('mvTipoRep').value;
   const dl=document.getElementById('repConceptoList');
   if(!dl)return;
-  const reps=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.concepto&&(!tipo||!m.tipoRep||m.tipoRep===tipo));
+  const reps=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.concepto&&(tipo?m.tipoRep===tipo:true));
   const unique=[...new Set(reps.map(m=>m.concepto.trim()).filter(Boolean))].sort();
   dl.innerHTML=unique.map(c=>`<option value="${c}">`).join('');
 }
@@ -2574,7 +2574,15 @@ function renderRepBD(){
     const editRow=document.createElement('tr');
     editRow.className='rep-edit-row';
     editRow.style.display='none';
+    const tipoOpts=['Aceite/Servicio','Motor','Frenos','Clutch','Eléctrico','Suspensión','Carrocería','Llantas','Otro']
+      .map(t=>`<option value="${t}"${m.tipoRep===t?' selected':''}>${t==='Aceite/Servicio'?'Aceite / Servicio':t}</option>`).join('');
     editRow.innerHTML=`<td colspan="8"><div class="rep-edit-inner">
+      <div class="fo" style="min-width:150px"><label>Tipo de reparación</label>
+        <select class="erTipo" style="font-size:12px">
+          <option value="">— Sin tipo —</option>
+          ${tipoOpts}
+        </select>
+      </div>
       <div class="fo" style="min-width:160px"><label>Proveedor</label>
         <select class="erProv" style="font-size:12px">
           <option value="">— Sin proveedor —</option>
@@ -2604,24 +2612,29 @@ function renderRepBD(){
       editRow.style.display=isOpen?'none':'table-row';
       if(!isOpen) populateErHomologa(editRow,m);
     });
+    const erTipo=editRow.querySelector('.erTipo');
     const erProv=editRow.querySelector('.erProv');
     const erId=editRow.querySelector('.erId');
+    const regenId=()=>{
+      if(!erProv.value||!erTipo.value)return;
+      erId.value=genRepId(m.autoId,erTipo.value,erProv.value);
+      populateErHomologa(editRow,m);
+    };
+    erTipo.addEventListener('change',regenId);
     erProv.addEventListener('change',()=>{
       if(!erProv.value){erId.value='';return;}
-      // Auto-generate ID si el campo está vacío (incluye tipo de reparación)
-      if(!erId.value.trim()){
-        erId.value=genRepId(m.autoId,m.tipoRep,erProv.value);
-      }
-      populateErHomologa(editRow,m);
+      regenId();
     });
     editRow.querySelector('.erCancelar').addEventListener('click',()=>{editRow.style.display='none';});
     editRow.querySelector('.erGuardar').addEventListener('click',()=>{
       const provId=erProv.value;
       const repId=erId.value.trim();
+      const tipo=erTipo.value;
       const idx=MOVS.findIndex(x=>x.id===m.id);
       if(idx<0)return;
       MOVS[idx].proveedorId=provId||undefined;
       MOVS[idx].repId=repId||undefined;
+      if(tipo)MOVS[idx].tipoRep=tipo;
       save();renderRepBD();toast(`✓ ID ${repId||'eliminado'} guardado`);
     });
     if(m.repId){
@@ -2640,13 +2653,15 @@ function renderRepBD(){
 
 function populateErHomologa(editRow,m){
   const provId=editRow.querySelector('.erProv').value;
+  const tipoSel=editRow.querySelector('.erTipo');
+  const tipoActivo=tipoSel?tipoSel.value:m.tipoRep;
   const erHom=editRow.querySelector('.erHomologa');
   const erId=editRow.querySelector('.erId');
   const erHist=editRow.querySelector('.erHistorial');
   // IDs existentes para el mismo auto + tipo + proveedor (excluyendo este mov)
   const existIds=[...new Set(MOVS.filter(x=>
     x.categoria==='Reparaciones'&&x.autoId===m.autoId&&
-    x.tipoRep===m.tipoRep&&
+    (!tipoActivo||!x.tipoRep||x.tipoRep===tipoActivo)&&
     (provId?x.proveedorId===provId:true)&&x.repId&&x.id!==m.id
   ).map(x=>x.repId))].sort();
   erHom.innerHTML='<option value="">— Nuevo ID —</option>'+
