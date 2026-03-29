@@ -2416,7 +2416,8 @@ function findRepMatch(autoId,tipoRep,provId,concepto){
   const c=concepto.trim().toLowerCase();
   return MOVS.find(m=>
     m.categoria==='Reparaciones'&&m.autoId===autoId&&
-    m.tipoRep===tipoRep&&m.proveedorId===provId&&
+    (!m.tipoRep||m.tipoRep===tipoRep)&&  // si el registro no tiene tipo, igual coincide
+    m.proveedorId===provId&&
     m.concepto&&m.concepto.trim().toLowerCase()===c&&m.repId
   )||null;
 }
