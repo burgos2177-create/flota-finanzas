@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FlotaFinanzas</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
 :root{--bg:#0f1117;--sur:#181c27;--sur2:#1e2334;--bor:rgba(255,255,255,0.07);--bor2:rgba(255,255,255,0.13);--tx:#e8eaf0;--tx2:#8b90a0;--tx3:#555a6e;--gr:#4ade80;--grd:rgba(74,222,128,.12);--grb:rgba(74,222,128,.3);--re:#f87171;--red:rgba(248,113,113,.12);--reb:rgba(248,113,113,.3);--ye:#fbbf24;--yed:rgba(251,191,36,.12);--or:#fb923c;--ord:rgba(251,146,60,.12);--bl:#60a5fa;--bld:rgba(96,165,250,.1);--r:10px;--mo:'DM Mono',monospace;--fn:'Sora',sans-serif;--nw:230px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -196,6 +198,10 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="ni" id="btnExport">↓ &nbsp;Exportar datos</div>
   <div class="ni" id="btnImport">↑ &nbsp;Importar datos</div>
   <input type="file" id="importFile" accept=".json" style="display:none">
+  <div class="ns" style="margin-top:8px">Nube</div>
+  <div class="ni" data-pg="nube" style="justify-content:space-between">
+    <span>☁ &nbsp;Sincronización</span><span id="cloudDot" style="font-size:9px">⚫</span>
+  </div>
 </nav>
 
 <main>
@@ -453,6 +459,68 @@ tr.d3{background:rgba(248,113,113,.04)}
 
 </main>
 
+<!-- NUBE / SINCRONIZACIÓN -->
+<div id="pg-nube" class="pg">
+  <div class="pt">Sincronización en la nube</div>
+  <div class="ps">Conecta con Firebase para acceder a tus datos desde cualquier dispositivo.</div>
+
+  <div class="card">
+    <div class="ct">Estado de conexión</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span id="cloudStatusDot" style="font-size:22px">⚫</span>
+      <div>
+        <div id="cloudStatusText" style="color:var(--tx);font-size:14px;font-weight:500">Sin configurar</div>
+        <div id="lastSyncTime" style="font-size:11px;color:var(--tx3);margin-top:2px"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bp" id="btnSyncNow" disabled>↕ &nbsp;Sincronizar ahora</button>
+      <button class="btn bd" id="btnDisconnect" style="display:none">✕ &nbsp;Desconectar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Configuración de Firebase</div>
+    <p style="color:var(--tx2);font-size:13px;margin-bottom:16px">
+      1. Ve a <strong style="color:var(--tx)">console.firebase.google.com</strong> y crea un proyecto gratis.<br>
+      2. Activa <strong style="color:var(--tx)">Realtime Database</strong> (modo test).<br>
+      3. En Configuración del proyecto → copia los datos y pégalos aquí.
+    </p>
+    <div class="fg">
+      <div class="fo full"><label>API Key *</label><input id="fbApiKey" type="password" placeholder="AIzaSy..."></div>
+      <div class="fo full"><label>Database URL *</label><input id="fbDbUrl" placeholder="https://mi-proyecto-default-rtdb.firebaseio.com"></div>
+      <div class="fo"><label>Project ID</label><input id="fbProjectId" placeholder="mi-proyecto"></div>
+      <div class="fo"><label>Auth Domain</label><input id="fbAuthDomain" placeholder="mi-proyecto.firebaseapp.com"></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <details>
+        <summary style="cursor:pointer;color:var(--tx2);font-size:12px;font-family:var(--mo);padding:4px 0">▶ ¿Cómo configurar las reglas de Firebase?</summary>
+        <div style="margin-top:10px;background:var(--sur2);border-radius:8px;padding:14px;font-size:12px;color:var(--tx2)">
+          En Firebase Console → Realtime Database → Reglas, pega esto y publica:<br>
+          <pre style="color:var(--gr);margin-top:8px;font-family:var(--mo)">&#123;
+  "rules": &#123;
+    ".read": true,
+    ".write": true
+  &#125;
+&#125;</pre>
+          <span style="color:var(--tx3);font-size:11px">Para uso personal. Nadie más sabrá tu Database URL.</span>
+        </div>
+      </details>
+    </div>
+    <button class="btn bp" id="btnConnect">☁ &nbsp;Conectar</button>
+  </div>
+
+  <div class="card">
+    <div class="ct">¿Cómo funciona?</div>
+    <ul style="color:var(--tx2);font-size:13px;line-height:2.1;padding-left:18px">
+      <li>Cada vez que guardas un dato se sincroniza automáticamente a Firebase.</li>
+      <li>Al abrir la app en cualquier dispositivo carga los datos desde la nube.</li>
+      <li>Los datos locales (localStorage) se mantienen como respaldo offline.</li>
+      <li>Puedes seguir usando Exportar/Importar JSON como backup adicional.</li>
+    </ul>
+  </div>
+</div>
+
 <!-- MODAL AUTO -->
 <div class="mb" id="modalAuto">
   <div class="md">
@@ -597,6 +665,128 @@ function save(){
   S.set('ff_inac',INACTIVIDAD);
   S.set('ff_contratos',CONTRATOS);
   S.set('ff_docs',DOCS);
+  syncToCloud();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLOUD SYNC — Firebase Realtime Database
+// ═══════════════════════════════════════════════════════════
+let _fbDB=null,_cloudSyncing=false,_syncTimer=null;
+let _cloudListenerRef=null,_cloudListenerCb=null;
+
+function setCloudDot(state){
+  const map={off:['⚫','Sin configurar'],syncing:['🔵','Sincronizando…'],ok:['🟢','Conectado'],error:['🔴','Error de conexión']};
+  const[dot,txt]=map[state]||map.off;
+  const d=document.getElementById('cloudDot');
+  const sd=document.getElementById('cloudStatusDot');
+  const st=document.getElementById('cloudStatusText');
+  if(d)d.textContent=dot;
+  if(sd)sd.textContent=dot;
+  if(st)st.textContent=txt;
+}
+
+function _applyCloudData(d){
+  if(d.AUTOS){AUTOS=d.AUTOS;S.set('ff_autos',AUTOS);}
+  if(d.MOVS){MOVS=d.MOVS;S.set('ff_movs',MOVS);}
+  if(d.CHOFERES){CHOFERES=d.CHOFERES;S.set('ff_choferes',CHOFERES);}
+  if(d.PERIODOS){PERIODOS=d.PERIODOS;S.set('ff_per',PERIODOS);}
+  if(d.INACTIVIDAD){INACTIVIDAD=d.INACTIVIDAD;S.set('ff_inac',INACTIVIDAD);}
+  if(d.CONTRATOS){CONTRATOS=d.CONTRATOS;S.set('ff_contratos',CONTRATOS);}
+  if(d.DOCS){DOCS=d.DOCS;S.set('ff_docs',DOCS);}
+}
+
+function _markSynced(){
+  const t=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  S.set('ff_last_sync',t);
+  const el=document.getElementById('lastSyncTime');
+  if(el)el.textContent='Última sync: '+t;
+  setCloudDot('ok');
+}
+
+function setupCloudListener(){
+  if(!_fbDB)return;
+  if(_cloudListenerRef&&_cloudListenerCb)_cloudListenerRef.off('value',_cloudListenerCb);
+  _cloudListenerRef=_fbDB.ref('flota/data');
+  let _first=true;
+  _cloudListenerCb=_cloudListenerRef.on('value',snap=>{
+    if(_first){_first=false;return;}// skip initial load (already done)
+    if(!snap.exists())return;
+    const d=snap.val();
+    const remoteTs=d._ts||0;
+    const localTs=S.get('ff_local_ts',0);
+    if(remoteTs>localTs+500){
+      _applyCloudData(d);
+      S.set('ff_local_ts',remoteTs);
+      _markSynced();
+      renderCurrentPage();
+    }
+  });
+}
+
+function renderCurrentPage(){
+  const pg=document.querySelector('.pg.on');
+  if(!pg)return;
+  const id=pg.id.replace('pg-','');
+  if(id==='dashboard')renderDash();
+  else if(id==='bitacora')renderBitacora();
+  else if(id==='autos')renderAutos();
+  else if(id==='choferes')renderChoferes();
+  else if(id==='semanal')renderSemanal();
+  else if(id==='mensual')renderMensual();
+  else if(id==='analisis')renderAnalisis();
+}
+
+async function loadFromCloud(){
+  if(!_fbDB)return;
+  try{
+    const snap=await _fbDB.ref('flota/data').get();
+    if(!snap.exists()){await syncToCloud(true);return;}
+    _applyCloudData(snap.val());
+    renderDash();
+  }catch(e){console.error('loadFromCloud:',e);setCloudDot('error');}
+}
+
+function syncToCloud(force=false){
+  if(!_fbDB)return;
+  if(_cloudSyncing&&!force)return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(async()=>{
+    _cloudSyncing=true;
+    setCloudDot('syncing');
+    try{
+      const ts=Date.now();
+      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,_ts:ts});
+      S.set('ff_local_ts',ts);
+      _markSynced();
+    }catch(e){console.error('syncToCloud:',e);setCloudDot('error');}
+    _cloudSyncing=false;
+  },800);
+}
+
+async function initFirebase(){
+  const cfg=S.get('ff_cloud_cfg',null);
+  if(!cfg?.apiKey||!cfg?.databaseURL){setCloudDot('off');return;}
+  try{
+    if(typeof firebase==='undefined'){setCloudDot('error');return;}
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    _fbDB=firebase.database();
+    setCloudDot('syncing');
+    await loadFromCloud();
+    setupCloudListener();
+    _markSynced();
+    const btnD=document.getElementById('btnDisconnect');
+    const btnS=document.getElementById('btnSyncNow');
+    if(btnD)btnD.style.display='';
+    if(btnS)btnS.disabled=false;
+    const savedTs=S.get('ff_last_sync',null);
+    const el=document.getElementById('lastSyncTime');
+    if(el&&savedTs)el.textContent='Última sync: '+savedTs;
+  }catch(e){
+    console.error('initFirebase:',e);
+    setCloudDot('error');
+    const st=document.getElementById('cloudStatusText');
+    if(st)st.textContent='Error: '+e.message;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1903,8 +2093,49 @@ document.getElementById('importFile').addEventListener('change',function(){
 });
 
 // ═══════════════════════════════════════════════════════════
+// CLOUD CONFIG HANDLERS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btnConnect').addEventListener('click',async()=>{
+  const apiKey=document.getElementById('fbApiKey').value.trim();
+  const databaseURL=document.getElementById('fbDbUrl').value.trim();
+  const projectId=document.getElementById('fbProjectId').value.trim();
+  const authDomain=document.getElementById('fbAuthDomain').value.trim();
+  if(!apiKey||!databaseURL)return toast('API Key y Database URL son requeridos','er');
+  if(_fbDB)return toast('Ya conectado. Recarga la página para re-configurar.','er');
+  S.set('ff_cloud_cfg',{apiKey,databaseURL,projectId,authDomain});
+  await initFirebase();
+  if(_fbDB)toast('☁ Conectado a Firebase ✓');
+});
+
+document.getElementById('btnDisconnect').addEventListener('click',async()=>{
+  if(!await confirmar('¿Desconectar la nube? Los datos locales se mantienen.','Desconectar','bd'))return;
+  S.set('ff_cloud_cfg',null);_fbDB=null;
+  if(_cloudListenerRef&&_cloudListenerCb)_cloudListenerRef.off('value',_cloudListenerCb);
+  _cloudListenerRef=null;_cloudListenerCb=null;
+  setCloudDot('off');
+  document.getElementById('btnDisconnect').style.display='none';
+  document.getElementById('btnSyncNow').disabled=true;
+  toast('Desconectado de la nube');
+});
+
+document.getElementById('btnSyncNow').addEventListener('click',()=>syncToCloud(true));
+
+// Pre-fill saved config
+(()=>{
+  const cfg=S.get('ff_cloud_cfg',null);
+  if(!cfg)return;
+  if(cfg.apiKey)document.getElementById('fbApiKey').value=cfg.apiKey;
+  if(cfg.databaseURL)document.getElementById('fbDbUrl').value=cfg.databaseURL;
+  if(cfg.projectId)document.getElementById('fbProjectId').value=cfg.projectId;
+  if(cfg.authDomain)document.getElementById('fbAuthDomain').value=cfg.authDomain;
+  const savedTs=S.get('ff_last_sync',null);
+  if(savedTs){const el=document.getElementById('lastSyncTime');if(el)el.textContent='Última sync: '+savedTs;}
+})();
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
+initFirebase();
 renderDash();
 </script>
 <div id="printArea"></div>
