@@ -1314,6 +1314,11 @@ document.getElementById('btnGuardarMov').addEventListener('click',()=>{
     mov.tipoRep=document.getElementById('mvTipoRep').value;
     const provId=document.getElementById('repProveedor').value;
     if(provId){mov.proveedorId=provId;mov.repId=document.getElementById('repId').value.trim()||undefined;}
+    // Aviso si el precio difiere del historial del repId
+    if(mov.repId&&_repMatchMonto!=null&&Math.abs(monto-_repMatchMonto)>0.01){
+      const ok=confirm(`El precio anterior de "${mov.repId}" era ${fmt(_repMatchMonto)}.\n¿Guardar este movimiento con ${fmt(monto)}?`);
+      if(!ok)return;
+    }
   }
   if(categoria==='Inactividad'){
     const iniVal=document.getElementById('inacIni').value;
@@ -2322,7 +2327,10 @@ function updateRepConceptoList(){
   const unique=[...new Set(reps.map(m=>m.concepto.trim()).filter(Boolean))].sort();
   dl.innerHTML=unique.map(c=>`<option value="${c}">`).join('');
 }
-document.getElementById('mvTipoRep').addEventListener('change',updateRepConceptoList);
+document.getElementById('mvTipoRep').addEventListener('change',()=>{updateRepConceptoList();updateRepId();});
+document.getElementById('mvConcepto').addEventListener('input',()=>{
+  if(document.getElementById('mvCat').value==='Reparaciones')updateRepId();
+});
 
 // Nueva Reparación shortcut desde Base de reparaciones
 document.getElementById('btnNuevaRep').addEventListener('click',()=>{
@@ -2375,6 +2383,8 @@ function calcInac(){
 // ═══════════════════════════════════════════════════════════
 const getTaller=id=>TALLERES.find(t=>t.id===id);
 
+const TIPO_ABREV={'Aceite/Servicio':'AS','Motor':'M','Frenos':'F','Clutch':'C','Eléctrico':'E','Suspensión':'S','Carrocería':'CA','Llantas':'L','Otro':'O'};
+
 function autoPrefix(autoId){
   const a=getAuto(autoId);if(!a)return'??';
   const words=a.nombre.trim().split(/\s+/);
@@ -2387,13 +2397,36 @@ function tallerSufijo(tallerId){
   const t=getTaller(tallerId);if(!t)return'??';
   return((t.nombre1||'')[0]||'').toUpperCase()+((t.nombre2||'')[0]||'').toUpperCase();
 }
-function genRepId(autoId,tallerId){
+// genRepId: formato BN18-S-001-LJ; contador por auto+tipo+proveedor
+function genRepId(autoId,tipoRep,tallerId){
   const pfx=autoPrefix(autoId);
   const sfx=tallerSufijo(tallerId);
-  const existentes=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.autoId===autoId&&m.proveedorId===tallerId&&m.repId);
+  const tp=TIPO_ABREV[tipoRep]||'O';
+  const existentes=MOVS.filter(m=>
+    m.categoria==='Reparaciones'&&m.autoId===autoId&&
+    m.tipoRep===tipoRep&&m.proveedorId===tallerId&&m.repId
+  );
   const cnt=String(existentes.length+1).padStart(3,'0');
-  return`${pfx}-${cnt}-${sfx}`;
+  return`${pfx}-${tp}-${cnt}-${sfx}`;
 }
+
+// Buscar reparación existente con mismo auto+tipo+proveedor+concepto que tenga repId
+function findRepMatch(autoId,tipoRep,provId,concepto){
+  if(!concepto||!autoId||!provId||autoId==='__general__')return null;
+  const c=concepto.trim().toLowerCase();
+  return MOVS.find(m=>
+    m.categoria==='Reparaciones'&&m.autoId===autoId&&
+    m.tipoRep===tipoRep&&m.proveedorId===provId&&
+    m.concepto&&m.concepto.trim().toLowerCase()===c&&m.repId
+  )||null;
+}
+// Historial de precios de un repId (ordenado más reciente primero)
+function getRepHistorial(repId){
+  return MOVS.filter(m=>m.repId===repId&&m.monto!=null)
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+}
+
+let _repMatchMonto=null;
 
 function updateRepPanel(){
   const autoId=document.getElementById('mvAuto').value;
@@ -2405,17 +2438,42 @@ function updateRepPanel(){
 function updateRepId(){
   const provId=document.getElementById('repProveedor').value;
   const autoId=document.getElementById('mvAuto').value;
+  const tipoRep=document.getElementById('mvTipoRep').value;
+  const concepto=document.getElementById('mvConcepto').value.trim();
   const infoEl=document.getElementById('repIdInfo');
   const idInput=document.getElementById('repId');
+  _repMatchMonto=null;
   if(!provId||!autoId||autoId==='__general__'){
-    idInput.value='';infoEl.style.display='none';return;
+    idInput.value='';idInput.style.borderColor='';infoEl.style.display='none';return;
   }
-  const repId=genRepId(autoId,provId);
-  idInput.value=repId;
-  infoEl.style.display='block';
   const auto=getAuto(autoId);const taller=getTaller(provId);
-  const tn=taller?`${taller.nombre1} ${taller.nombre2}`:'?';
-  infoEl.innerHTML=`ID generado: <strong style="color:var(--ye);font-family:var(--mo)">${repId}</strong> · ${auto?auto.nombre:'?'} / ${tn}`;
+  const tn=taller?(taller.nombreCompleto||taller.nombre1+' '+taller.nombre2):'?';
+  const match=findRepMatch(autoId,tipoRep,provId,concepto);
+  if(match){
+    // Coincidencia exacta — mostrar ID existente
+    idInput.value=match.repId;
+    idInput.style.borderColor='var(--grb)';
+    const hist=getRepHistorial(match.repId);
+    const lastMonto=hist.length?hist[0].monto:null;
+    _repMatchMonto=lastMonto;
+    if(lastMonto!=null&&!document.getElementById('mvMonto').value){
+      document.getElementById('mvMonto').value=lastMonto;
+    }
+    const histHTML=hist.slice(0,5).map(h=>`<span>${h.fecha}: <b style="color:var(--ye);font-family:var(--mo)">${fmt(h.monto)}</b></span>`).join(' · ');
+    infoEl.style.display='block';
+    infoEl.innerHTML=`<span style="color:var(--gr)">✓ Reparación existente</span> · `+
+      `<strong style="color:var(--ye);font-family:var(--mo)">${match.repId}</strong>`+
+      (lastMonto!=null?` · Último precio: <span style="font-family:var(--mo);color:var(--ye)">${fmt(lastMonto)}</span>`:'')+
+      (histHTML?`<div style="margin-top:3px;font-size:10px;color:var(--tx3)">Historial: ${histHTML}</div>`:'');
+  } else {
+    // Sin coincidencia — generar nuevo ID
+    const repId=genRepId(autoId,tipoRep,provId);
+    idInput.value=repId;
+    idInput.style.borderColor='';
+    const noMatch=concepto?` · <span style="color:var(--tx3)">✗ Sin coincidencia con ningún ID registrado</span>`:'';
+    infoEl.style.display='block';
+    infoEl.innerHTML=`ID generado: <strong style="color:var(--ye);font-family:var(--mo)">${repId}</strong> · ${auto?auto.nombre:'?'} / ${tn}${noMatch}`;
+  }
 }
 document.getElementById('repProveedor').addEventListener('change',updateRepId);
 
@@ -2523,7 +2581,7 @@ function renderRepBD(){
         </select>
       </div>
       <div class="fo" style="min-width:160px"><label>ID de reparación</label>
-        <input type="text" class="erId" value="${m.repId||''}" placeholder="Ej: SB??-001-AL" style="font-family:var(--mo);font-size:12px">
+        <input type="text" class="erId" value="${m.repId||''}" placeholder="Ej: SB??-S-001-AL" style="font-family:var(--mo);font-size:12px">
       </div>
       <div class="fo" style="min-width:200px"><label>Homologar con ID existente</label>
         <select class="erHomologa" style="font-size:12px">
@@ -2535,6 +2593,7 @@ function renderRepBD(){
         <button class="btn bg sm erCancelar">✕</button>
         ${m.repId?`<button class="btn bd sm erQuitar" style="font-size:11px">Quitar ID</button>`:''}
       </div>
+      <div class="erHistorial" style="width:100%;font-size:10px;color:var(--tx3);margin-top:4px"></div>
     </div></td>`;
     // Wiring
     tr.querySelector('.btnAsignId').addEventListener('click',()=>{
@@ -2548,9 +2607,9 @@ function renderRepBD(){
     const erId=editRow.querySelector('.erId');
     erProv.addEventListener('change',()=>{
       if(!erProv.value){erId.value='';return;}
-      // Auto-generate ID if field is empty
+      // Auto-generate ID si el campo está vacío (incluye tipo de reparación)
       if(!erId.value.trim()){
-        erId.value=genRepId(m.autoId,erProv.value);
+        erId.value=genRepId(m.autoId,m.tipoRep,erProv.value);
       }
       populateErHomologa(editRow,m);
     });
@@ -2582,14 +2641,27 @@ function populateErHomologa(editRow,m){
   const provId=editRow.querySelector('.erProv').value;
   const erHom=editRow.querySelector('.erHomologa');
   const erId=editRow.querySelector('.erId');
-  // Get existing IDs for this auto + provider
+  const erHist=editRow.querySelector('.erHistorial');
+  // IDs existentes para el mismo auto + tipo + proveedor (excluyendo este mov)
   const existIds=[...new Set(MOVS.filter(x=>
     x.categoria==='Reparaciones'&&x.autoId===m.autoId&&
+    x.tipoRep===m.tipoRep&&
     (provId?x.proveedorId===provId:true)&&x.repId&&x.id!==m.id
   ).map(x=>x.repId))].sort();
   erHom.innerHTML='<option value="">— Nuevo ID —</option>'+
     existIds.map(id=>`<option value="${id}">${id}</option>`).join('');
-  erHom.onchange=()=>{if(erHom.value)erId.value=erHom.value;};
+  erHom.onchange=()=>{
+    if(erHom.value){erId.value=erHom.value;renderErHistorial(erHom.value,erHist);}
+  };
+  // Mostrar historial del ID actual (si ya tiene)
+  renderErHistorial(erId.value.trim()||m.repId,erHist);
+}
+function renderErHistorial(repId,container){
+  if(!repId||!container){return;}
+  const hist=getRepHistorial(repId);
+  if(!hist.length){container.textContent='';return;}
+  const rows=hist.slice(0,6).map(h=>`${h.fecha}: <b style="color:var(--ye);font-family:var(--mo)">${fmt(h.monto)}</b>`).join(' · ');
+  container.innerHTML=`Historial de precios (${repId}): ${rows}`;
 }
 
 document.querySelectorAll('[data-tallertab]').forEach(el=>{
