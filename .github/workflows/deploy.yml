@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["claude/deploy-live-cloud-sync-Nr7t4", "main"]
+    branches: ["master", "main", "claude/deploy-live-cloud-sync-Nr7t4"]
   workflow_dispatch:
 
 permissions:
