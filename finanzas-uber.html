@@ -194,6 +194,12 @@ tr.d3{background:rgba(248,113,113,.04)}
 .chart-tip{position:absolute;background:var(--sur2);border:1px solid var(--bor2);border-radius:7px;padding:6px 10px;font-size:12px;pointer-events:none;display:none;z-index:10;white-space:nowrap}
 /* INAC MINI STAT */
 .imini{display:flex;flex-direction:column;gap:2px}.imini .il{font-size:9px;font-family:var(--mo);color:var(--tx3);text-transform:uppercase;letter-spacing:.6px}.imini .iv{font-family:var(--mo);font-size:14px;font-weight:600}
+/* REPAIR EDIT ROW */
+.rep-edit-row td{padding:0!important;border-bottom:none!important}
+.rep-edit-inner{background:rgba(251,191,36,.06);border-bottom:1px solid rgba(251,191,36,.3);padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+/* SALDO FILTER PILLS */
+.scat-pill{padding:4px 10px;border-radius:20px;font-size:11px;font-family:var(--mo);cursor:pointer;border:1px solid var(--bor2);color:var(--tx2);transition:all .15s;user-select:none;white-space:nowrap}
+.scat-pill.on{opacity:.4;text-decoration:line-through}
 </style>
 </head>
 <body>
@@ -273,7 +279,7 @@ tr.d3{background:rgba(248,113,113,.04)}
           <option value="Otro">Otro</option>
         </select>
       </div>
-      <div class="fo"><label>Concepto *</label><input type="text" id="mvConcepto" placeholder="Describe el movimiento"></div>
+      <div class="fo"><label>Concepto *</label><input type="text" id="mvConcepto" placeholder="Describe el movimiento" list="repConceptoList" autocomplete="off"><datalist id="repConceptoList"></datalist></div>
       <div class="fo"><label>Monto (+ ingreso / − egreso) *</label><input type="number" id="mvMonto" placeholder="Ej: 2200 ó -3500" step="0.01"></div>
       <div class="fo"><label>Nota</label><input type="text" id="mvNota" placeholder="Detalle opcional"></div>
     </div>
@@ -481,7 +487,10 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div id="gridTalleres" class="cg"></div>
   <div id="secRepBD" style="display:none">
     <div class="card">
-      <div class="ct">Buscar en base de datos de reparaciones</div>
+      <div class="fb m16" style="margin-bottom:12px">
+        <div class="ct" style="margin:0">Base de datos de reparaciones</div>
+        <button class="btn bp sm" id="btnNuevaRep">＋ Nueva reparación</button>
+      </div>
       <div class="fb2" style="margin-bottom:14px">
         <input type="text" id="repSearch" placeholder="Buscar por concepto, ID, tipo..." style="flex:2;min-width:200px;max-width:none">
         <select id="repSearchAuto" style="min-width:160px"><option value="">Todos los autos</option></select>
@@ -489,7 +498,7 @@ tr.d3{background:rgba(248,113,113,.04)}
         <button class="btn bg sm" id="btnLimpiarRepSearch">✕ Limpiar</button>
       </div>
       <div class="tw"><table class="stbl">
-        <thead><tr><th>ID</th><th>Auto</th><th>Proveedor</th><th>Concepto</th><th>Tipo</th><th>Fecha</th><th>Monto</th></tr></thead>
+        <thead><tr><th>ID</th><th>Auto</th><th>Proveedor</th><th>Concepto</th><th>Tipo</th><th>Fecha</th><th>Monto</th><th></th></tr></thead>
         <tbody id="tRepBD"></tbody>
       </table></div>
     </div>
@@ -501,6 +510,11 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="pt">Saldo de la flota</div>
   <div class="ps">Evolución del saldo total acumulado de la flotilla.</div>
   <div class="card">
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;font-family:var(--mo);color:var(--tx3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">Excluir categorías de la gráfica</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="saldoCatFiltros"></div>
+      <div style="font-size:10px;color:var(--tx3);margin-top:5px">Haz clic en una categoría para <strong>excluirla</strong> del cálculo del saldo.</div>
+    </div>
     <div class="ptabs" id="saldoPeriodTabs">
       <div class="ptab" data-period="1D">1D</div>
       <div class="ptab" data-period="1S">1S</div>
@@ -1239,7 +1253,7 @@ document.getElementById('mvCat').addEventListener('change',function(){
   document.getElementById('foTipoRep').style.display=cat==='Reparaciones'?'flex':'none';
   document.getElementById('repPanel').style.display=cat==='Reparaciones'?'block':'none';
   document.getElementById('inacPanel').style.display=cat==='Inactividad'?'block':'none';
-  if(cat==='Reparaciones') updateRepPanel();
+  if(cat==='Reparaciones'){updateRepPanel();updateRepConceptoList();}
   if(cat==='Inactividad') calcInac();
   if(cat==='Abonos'){
     panel.style.display='block';
@@ -2298,6 +2312,26 @@ document.getElementById('btnSyncNow').addEventListener('click',()=>syncToCloud(t
   if(savedTs){const el=document.getElementById('lastSyncTime');if(el)el.textContent='Última sync: '+savedTs;}
 })();
 
+// REPARACIONES — concepto datalist autocomplete
+// ═══════════════════════════════════════════════════════════
+function updateRepConceptoList(){
+  const tipo=document.getElementById('mvTipoRep').value;
+  const dl=document.getElementById('repConceptoList');
+  if(!dl)return;
+  const reps=MOVS.filter(m=>m.categoria==='Reparaciones'&&m.concepto&&(!tipo||!m.tipoRep||m.tipoRep===tipo));
+  const unique=[...new Set(reps.map(m=>m.concepto.trim()).filter(Boolean))].sort();
+  dl.innerHTML=unique.map(c=>`<option value="${c}">`).join('');
+}
+document.getElementById('mvTipoRep').addEventListener('change',updateRepConceptoList);
+
+// Nueva Reparación shortcut desde Base de reparaciones
+document.getElementById('btnNuevaRep').addEventListener('click',()=>{
+  goTo('movimiento');
+  document.getElementById('mvCat').value='Reparaciones';
+  document.getElementById('mvCat').dispatchEvent(new Event('change'));
+  setTimeout(()=>document.getElementById('mvConcepto').focus(),100);
+});
+
 // INACTIVIDAD PANEL — cálculo en tiempo real
 // ═══════════════════════════════════════════════════════════
 function calcInac(){
@@ -2458,7 +2492,7 @@ function renderRepBD(){
   if(fT)reps=reps.filter(m=>m.proveedorId===fT);
   const tbody=document.getElementById('tRepBD');
   if(!reps.length){
-    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">Sin reparaciones${q?' que coincidan':''} registradas.</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--tx3)">Sin reparaciones${q?' que coincidan':''} registradas.</td></tr>`;
     return;
   }
   tbody.innerHTML='';
@@ -2467,16 +2501,95 @@ function renderRepBD(){
     const taller=m.proveedorId?getTaller(m.proveedorId):null;
     const tn=taller?(taller.nombreCompleto||taller.nombre1+' '+taller.nombre2):'—';
     const tr=document.createElement('tr');
+    const hasId=!!m.repId;
     tr.innerHTML=`
-      <td class="mo">${m.repId?`<span class="b by" style="font-family:var(--mo);font-size:11px">${m.repId}</span>`:'<span style="color:var(--tx3)">—</span>'}</td>
+      <td class="mo">${hasId?`<span class="b by" style="font-family:var(--mo);font-size:11px">${m.repId}</span>`:'<span style="color:var(--tx3);font-size:11px">sin ID</span>'}</td>
       <td style="font-weight:500;color:var(--tx)">${auto?auto.nombre:'—'}</td>
       <td class="ts tm">${tn}</td>
       <td>${m.concepto}</td>
       <td>${m.tipoRep?`<span class="b bgr">${m.tipoRep}</span>`:'—'}</td>
       <td class="mo">${fdate(m.fecha)}</td>
-      <td class="an">${fmt(m.monto)}</td>`;
+      <td class="an">${fmt(m.monto)}</td>
+      <td><button class="btn ${hasId?'bg':'bo'} sm btnAsignId" style="font-size:11px">${hasId?'✏ ID':'+ ID'}</button></td>`;
+    // Edit row (hidden by default)
+    const editRow=document.createElement('tr');
+    editRow.className='rep-edit-row';
+    editRow.style.display='none';
+    editRow.innerHTML=`<td colspan="8"><div class="rep-edit-inner">
+      <div class="fo" style="min-width:160px"><label>Proveedor</label>
+        <select class="erProv" style="font-size:12px">
+          <option value="">— Sin proveedor —</option>
+          ${TALLERES.map(t=>`<option value="${t.id}"${t.id===m.proveedorId?' selected':''}>${t.nombreCompleto||t.nombre1+' '+t.nombre2}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fo" style="min-width:160px"><label>ID de reparación</label>
+        <input type="text" class="erId" value="${m.repId||''}" placeholder="Ej: SB??-001-AL" style="font-family:var(--mo);font-size:12px">
+      </div>
+      <div class="fo" style="min-width:200px"><label>Homologar con ID existente</label>
+        <select class="erHomologa" style="font-size:12px">
+          <option value="">— Nuevo ID —</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px">
+        <button class="btn bp sm erGuardar">✓ Guardar</button>
+        <button class="btn bg sm erCancelar">✕</button>
+        ${m.repId?`<button class="btn bd sm erQuitar" style="font-size:11px">Quitar ID</button>`:''}
+      </div>
+    </div></td>`;
+    // Wiring
+    tr.querySelector('.btnAsignId').addEventListener('click',()=>{
+      const isOpen=editRow.style.display!=='none';
+      // Close all other open edit rows
+      tbody.querySelectorAll('.rep-edit-row').forEach(r=>{if(r!==editRow)r.style.display='none';});
+      editRow.style.display=isOpen?'none':'table-row';
+      if(!isOpen) populateErHomologa(editRow,m);
+    });
+    const erProv=editRow.querySelector('.erProv');
+    const erId=editRow.querySelector('.erId');
+    erProv.addEventListener('change',()=>{
+      if(!erProv.value){erId.value='';return;}
+      // Auto-generate ID if field is empty
+      if(!erId.value.trim()){
+        erId.value=genRepId(m.autoId,erProv.value);
+      }
+      populateErHomologa(editRow,m);
+    });
+    editRow.querySelector('.erCancelar').addEventListener('click',()=>{editRow.style.display='none';});
+    editRow.querySelector('.erGuardar').addEventListener('click',()=>{
+      const provId=erProv.value;
+      const repId=erId.value.trim();
+      const idx=MOVS.findIndex(x=>x.id===m.id);
+      if(idx<0)return;
+      MOVS[idx].proveedorId=provId||undefined;
+      MOVS[idx].repId=repId||undefined;
+      save();renderRepBD();toast(`✓ ID ${repId||'eliminado'} guardado`);
+    });
+    if(m.repId){
+      editRow.querySelector('.erQuitar').addEventListener('click',async()=>{
+        if(!await confirmar('¿Quitar el ID de esta reparación?'))return;
+        const idx=MOVS.findIndex(x=>x.id===m.id);
+        if(idx<0)return;
+        delete MOVS[idx].repId;delete MOVS[idx].proveedorId;
+        save();renderRepBD();toast('ID removido');
+      });
+    }
     tbody.appendChild(tr);
+    tbody.appendChild(editRow);
   });
+}
+
+function populateErHomologa(editRow,m){
+  const provId=editRow.querySelector('.erProv').value;
+  const erHom=editRow.querySelector('.erHomologa');
+  const erId=editRow.querySelector('.erId');
+  // Get existing IDs for this auto + provider
+  const existIds=[...new Set(MOVS.filter(x=>
+    x.categoria==='Reparaciones'&&x.autoId===m.autoId&&
+    (provId?x.proveedorId===provId:true)&&x.repId&&x.id!==m.id
+  ).map(x=>x.repId))].sort();
+  erHom.innerHTML='<option value="">— Nuevo ID —</option>'+
+    existIds.map(id=>`<option value="${id}">${id}</option>`).join('');
+  erHom.onchange=()=>{if(erHom.value)erId.value=erHom.value;};
 }
 
 document.querySelectorAll('[data-tallertab]').forEach(el=>{
@@ -2537,9 +2650,30 @@ document.getElementById('btnOkTaller').addEventListener('click',()=>{
 // SALDO FLOTA — CHART
 // ═══════════════════════════════════════════════════════════
 let _saldoPeriod='ALL';
+const ALL_CATS=['Abonos','Reparaciones','Reinversión','GPS','Seguro','Inactividad','Administración','Utilidad','Otro'];
+let _saldoExcluded=new Set(); // categories excluded from the chart
+
+function renderSaldoCatFiltros(){
+  const el=document.getElementById('saldoCatFiltros');
+  if(!el)return;
+  el.innerHTML='';
+  ALL_CATS.forEach(cat=>{
+    const pill=document.createElement('div');
+    pill.className='scat-pill'+(_saldoExcluded.has(cat)?' on':'');
+    pill.textContent=cat;
+    pill.title=_saldoExcluded.has(cat)?'Incluir en el cálculo':'Excluir del cálculo';
+    pill.addEventListener('click',()=>{
+      if(_saldoExcluded.has(cat))_saldoExcluded.delete(cat);
+      else _saldoExcluded.add(cat);
+      renderSaldoCatFiltros();
+      drawSaldoChart();
+    });
+    el.appendChild(pill);
+  });
+}
 
 function getBalanceTimeline(period){
-  const sorted=[...MOVS].sort((a,b)=>a.fecha.localeCompare(b.fecha)||a._ts-b._ts);
+  const sorted=[...MOVS].filter(m=>!_saldoExcluded.has(m.categoria)).sort((a,b)=>a.fecha.localeCompare(b.fecha)||a._ts-b._ts);
   if(!sorted.length)return[];
   let bal=0;
   const all=sorted.map(m=>({date:new Date(m.fecha+'T12:00:00'),balance:(bal+=Number(m.monto),bal)}));
@@ -2676,6 +2810,7 @@ function initSaldoTooltip(){
 }
 
 function renderSaldo(){
+  renderSaldoCatFiltros();
   drawSaldoChart();
   initSaldoTooltip();
 }
