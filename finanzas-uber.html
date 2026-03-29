@@ -184,6 +184,11 @@ tr.d3{background:rgba(248,113,113,.04)}
 .rep-panel .rpt{font-size:10px;font-family:var(--mo);color:var(--ye);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
 /* PURPLE BADGE */
 .bpu{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.3)}
+/* TEAL BADGE — Adquisiciones/Venta */
+.btl{background:rgba(45,212,191,.1);color:#2dd4bf;border:1px solid rgba(45,212,191,.3)}
+/* EDIT MOV MODAL */
+.emmodal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center}
+.embox{background:var(--sur);border:1px solid var(--bor2);border-radius:var(--r);padding:24px;width:min(620px,92vw);max-height:90vh;overflow-y:auto}
 /* PERIOD TABS */
 .ptabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px}
 .ptab{padding:5px 10px;border-radius:5px;font-size:11px;font-family:var(--mo);cursor:pointer;border:1px solid var(--bor2);color:var(--tx2);transition:all .15s;user-select:none}
@@ -262,6 +267,7 @@ tr.d3{background:rgba(248,113,113,.04)}
           <option value="Seguro">Seguro</option>
           <option value="Inactividad">Inactividad</option>
           <option value="Administración">Administración</option>
+          <option value="Adquisiciones/Venta">Adquisiciones / Venta</option>
           <option value="Utilidad">Utilidad / Retiro</option>
           <option value="Otro">Otro</option>
         </select>
@@ -350,6 +356,7 @@ tr.d3{background:rgba(248,113,113,.04)}
       <option value="Reinversión">Reinversión</option><option value="GPS">GPS</option>
       <option value="Seguro">Seguro</option><option value="Inactividad">Inactividad</option>
       <option value="Administración">Administración</option>
+      <option value="Adquisiciones/Venta">Adquisiciones/Venta</option>
       <option value="Utilidad">Utilidad</option><option value="Otro">Otro</option>
     </select>
     <select id="fTipo"><option value="">Ingresos y egresos</option><option value="i">Solo ingresos</option><option value="e">Solo egresos</option></select>
@@ -994,7 +1001,7 @@ function getChoferEnFecha(autoId,fecha){
 }
 
 function catBadge(cat){
-  const m={Abonos:'bg2',Reparaciones:'br',Reinversión:'by',GPS:'bb',Seguro:'bb',Inactividad:'bgr',Administración:'bpu',Utilidad:'bg2',Otro:'bgr'};
+  const m={Abonos:'bg2',Reparaciones:'br',Reinversión:'by',GPS:'bb',Seguro:'bb',Inactividad:'bgr',Administración:'bpu','Adquisiciones/Venta':'btl',Utilidad:'bg2',Otro:'bgr'};
   return`<span class="b ${m[cat]||'bgr'}">${cat}</span>`;
 }
 function delBadge(d){
@@ -1412,9 +1419,12 @@ function renderBitacora(){
         <td class="${m.monto>=0?'ap':'an'}">${fmt(m.monto)}</td>
         <td class="ab">${fmt(sal)}</td>
         <td class="ts tm">${m.nota||''}</td>
-        <td><button class="btn bd sm">✕</button></td>`;
-      // Attach delete listener directly to this row's button
-      tr.querySelector('button').addEventListener('click',async()=>{
+        <td style="white-space:nowrap">
+          <button class="btn bg sm btnEditMov" style="margin-right:4px">✎</button>
+          <button class="btn bd sm btnDelMov">✕</button>
+        </td>`;
+      tr.querySelector('.btnEditMov').addEventListener('click',()=>abrirEditMov(m));
+      tr.querySelector('.btnDelMov').addEventListener('click',async()=>{
         if(!await confirmar('¿Eliminar este movimiento?'))return;
         MOVS=MOVS.filter(x=>x.id!==m.id);
         save();renderBitacora();toast('Movimiento eliminado');
@@ -2738,7 +2748,7 @@ document.getElementById('btnOkTaller').addEventListener('click',()=>{
 // SALDO FLOTA — CHART
 // ═══════════════════════════════════════════════════════════
 let _saldoPeriod='ALL';
-const ALL_CATS=['Abonos','Reparaciones','Reinversión','GPS','Seguro','Inactividad','Administración','Utilidad','Otro'];
+const ALL_CATS=['Abonos','Reparaciones','Reinversión','GPS','Seguro','Inactividad','Administración','Adquisiciones/Venta','Utilidad','Otro'];
 let _saldoExcluded=new Set(); // categories excluded from the chart
 
 function renderSaldoCatFiltros(){
@@ -2916,7 +2926,116 @@ document.querySelectorAll('.ptab').forEach(el=>{
 // ═══════════════════════════════════════════════════════════
 initFirebase();
 renderDash();
+// ═══════════════════════════════════════════════════════════
+// EDITAR MOVIMIENTO
+// ═══════════════════════════════════════════════════════════
+let _editMovId=null;
+function abrirEditMov(m){
+  _editMovId=m.id;
+  document.getElementById('emFecha').value=m.fecha||'';
+  document.getElementById('emCat').value=m.categoria||'';
+  document.getElementById('emConcepto').value=m.concepto||'';
+  document.getElementById('emMonto').value=m.monto!=null?m.monto:'';
+  document.getElementById('emNota').value=m.nota||'';
+  // Reparaciones extra
+  const isRep=m.categoria==='Reparaciones';
+  document.getElementById('emRepFields').style.display=isRep?'block':'none';
+  if(isRep){
+    document.getElementById('emTipoRep').value=m.tipoRep||'';
+    const sel=document.getElementById('emProveedor');
+    sel.innerHTML='<option value="">— Sin proveedor —</option>'+
+      TALLERES.map(t=>`<option value="${t.id}"${t.id===m.proveedorId?' selected':''}>${t.nombreCompleto||t.nombre1+' '+t.nombre2}</option>`).join('');
+    document.getElementById('emRepId').value=m.repId||'';
+  }
+  document.getElementById('emCat').onchange=function(){
+    document.getElementById('emRepFields').style.display=this.value==='Reparaciones'?'block':'none';
+  };
+  document.getElementById('editMovModal').style.display='flex';
+}
+function cerrarEditMov(){
+  document.getElementById('editMovModal').style.display='none';
+  _editMovId=null;
+}
+document.getElementById('btnGuardarEditMov').addEventListener('click',()=>{
+  if(!_editMovId)return;
+  const idx=MOVS.findIndex(x=>x.id===_editMovId);
+  if(idx<0)return;
+  const fecha=document.getElementById('emFecha').value;
+  const cat=document.getElementById('emCat').value;
+  const concepto=document.getElementById('emConcepto').value.trim();
+  const monto=parseFloat(document.getElementById('emMonto').value);
+  if(!fecha||!cat||!concepto||isNaN(monto))return toast('Completa los campos obligatorios','er');
+  MOVS[idx].fecha=fecha;
+  MOVS[idx].categoria=cat;
+  MOVS[idx].concepto=concepto;
+  MOVS[idx].monto=monto;
+  MOVS[idx].nota=document.getElementById('emNota').value.trim()||undefined;
+  MOVS[idx]._ts=Date.now();
+  if(cat==='Reparaciones'){
+    const tipo=document.getElementById('emTipoRep').value;
+    const prov=document.getElementById('emProveedor').value;
+    const repId=document.getElementById('emRepId').value.trim();
+    if(tipo)MOVS[idx].tipoRep=tipo; else delete MOVS[idx].tipoRep;
+    if(prov)MOVS[idx].proveedorId=prov; else delete MOVS[idx].proveedorId;
+    if(repId)MOVS[idx].repId=repId; else delete MOVS[idx].repId;
+  }
+  save();cerrarEditMov();renderBitacora();toast('✓ Movimiento actualizado');
+});
 </script>
 <div id="printArea"></div>
+<!-- MODAL EDITAR MOVIMIENTO -->
+<div id="editMovModal" class="emmodal" style="display:none" onclick="if(event.target===this)cerrarEditMov()">
+  <div class="embox">
+    <div class="fb m16" style="margin-bottom:16px">
+      <div style="font-size:15px;font-weight:600">Editar movimiento</div>
+      <button class="btn bg sm" onclick="cerrarEditMov()">✕</button>
+    </div>
+    <div class="fg">
+      <div class="fo"><label>Fecha *</label><input type="date" id="emFecha"></div>
+      <div class="fo"><label>Categoría *</label>
+        <select id="emCat">
+          <option value="Abonos">Abonos (renta chofer)</option>
+          <option value="Reparaciones">Reparaciones</option>
+          <option value="Reinversión">Reinversión</option>
+          <option value="GPS">GPS</option>
+          <option value="Seguro">Seguro</option>
+          <option value="Inactividad">Inactividad</option>
+          <option value="Administración">Administración</option>
+          <option value="Adquisiciones/Venta">Adquisiciones / Venta</option>
+          <option value="Utilidad">Utilidad / Retiro</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="fo full"><label>Concepto *</label><input type="text" id="emConcepto"></div>
+      <div class="fo"><label>Monto *</label><input type="number" id="emMonto" step="0.01"></div>
+      <div class="fo full"><label>Nota</label><input type="text" id="emNota" placeholder="Detalle opcional"></div>
+    </div>
+    <div id="emRepFields" style="display:none;margin-top:4px">
+      <div style="font-size:10px;font-family:var(--mo);color:var(--tx3);letter-spacing:.8px;margin-bottom:10px;text-transform:uppercase">Reparación</div>
+      <div class="fg">
+        <div class="fo"><label>Tipo</label>
+          <select id="emTipoRep">
+            <option value="">— Sin tipo —</option>
+            <option value="Aceite/Servicio">Aceite / Servicio</option>
+            <option value="Motor">Motor</option>
+            <option value="Frenos">Frenos</option>
+            <option value="Clutch">Clutch</option>
+            <option value="Eléctrico">Eléctrico</option>
+            <option value="Suspensión">Suspensión</option>
+            <option value="Carrocería">Carrocería</option>
+            <option value="Llantas">Llantas</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="fo"><label>Proveedor / Taller</label><select id="emProveedor"><option value="">— Sin proveedor —</option></select></div>
+        <div class="fo"><label>ID de reparación</label><input type="text" id="emRepId" style="font-family:var(--mo)"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn bp" id="btnGuardarEditMov">✓ Guardar cambios</button>
+      <button class="btn bg" onclick="cerrarEditMov()">Cancelar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
