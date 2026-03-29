@@ -12,7 +12,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--fn);background:var(--bg);color:var(--tx);min-height:100vh;display:flex;font-size:14px;line-height:1.6}
 /* NAV */
-nav{width:var(--nw);min-height:100vh;background:var(--sur);border-right:1px solid var(--bor);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;z-index:100;overflow-y:auto}
+nav{width:var(--nw);height:100vh;background:var(--sur);border-right:1px solid var(--bor);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;z-index:100;overflow-y:auto}
 .nl{padding:0 20px 20px;border-bottom:1px solid var(--bor);margin-bottom:12px}
 .nl span{font-size:17px;font-weight:600;color:var(--gr);letter-spacing:-.5px}
 .nl small{display:block;font-family:var(--mo);font-size:10px;color:var(--tx3);margin-top:2px}
@@ -901,8 +901,18 @@ async function loadFromCloud(){
   try{
     const snap=await _fbDB.ref('flota/data').get();
     if(!snap.exists()){await syncToCloud(true);return;}
-    _applyCloudData(snap.val());
-    renderDash();
+    const d=snap.val();
+    const remoteTs=d._ts||0;
+    const localTs=S.get('ff_local_ts',0);
+    if(remoteTs>localTs){
+      // La nube tiene datos más recientes → aplicar
+      _applyCloudData(d);
+      S.set('ff_local_ts',remoteTs);
+      renderDash();
+    } else {
+      // Local es igual o más reciente → subir a la nube
+      syncToCloud(true);
+    }
   }catch(e){console.error('loadFromCloud:',e);setCloudDot('error');}
 }
 
