@@ -645,6 +645,19 @@ tr.d3{background:rgba(248,113,113,.04)}
 
 <script>
 // ═══════════════════════════════════════════════════════════
+// FIREBASE DEFAULT CONFIG (auto-conecta en cualquier dispositivo)
+// ═══════════════════════════════════════════════════════════
+const FIREBASE_DEFAULT_CONFIG = {
+  apiKey: "AIzaSyCxeDscYCLDRTvLrs8tiE-7hjxj_H92N9Q",
+  authDomain: "database-flotilla.firebaseapp.com",
+  databaseURL: "https://database-flotilla-default-rtdb.firebaseio.com",
+  projectId: "database-flotilla",
+  storageBucket: "database-flotilla.firebasestorage.app",
+  messagingSenderId: "1021807829315",
+  appId: "1:1021807829315:web:a7ebc594f7e003aeb78ff6"
+};
+
+// ═══════════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════════
 const S = {
@@ -764,7 +777,7 @@ function syncToCloud(force=false){
 }
 
 async function initFirebase(){
-  const cfg=S.get('ff_cloud_cfg',null);
+  const cfg=S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
   if(!cfg?.apiKey||!cfg?.databaseURL){setCloudDot('off');return;}
   try{
     if(typeof firebase==='undefined'){setCloudDot('error');return;}
