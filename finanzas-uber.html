@@ -822,6 +822,8 @@ function save(){
   S.set('ff_inac',INACTIVIDAD);
   S.set('ff_contratos',CONTRATOS);
   S.set('ff_talleres',TALLERES);
+  // Marcar timestamp local inmediatamente para proteger cambios antes del sync
+  S.set('ff_local_ts',Date.now());
   syncToCloud();
 }
 
@@ -2122,7 +2124,190 @@ function renderFlujo(){
 let _contratoChoferId=null;
 
 function generarTextoContrato(datos){
-  return `CONTRATO DE ARRENDAMIENTO DE VEHÍCULO\n\nEn la ciudad de Santiago de Querétaro, Querétaro, a ${datos.fecha}.\n\nPor una parte, el ARRENDADOR, y por otra parte, ${datos.nombre}, en adelante el ARRENDATARIO, celebran el presente contrato de arrendamiento de vehículo bajo las siguientes cláusulas:\n\nPRIMERA. El ARRENDADOR da en arrendamiento al ARRENDATARIO el vehículo con las siguientes características:\nModelo/Marca: ${datos.autoNombre}\nColor: ${datos.autoColor}\nPlacas: ${datos.autoPlacas}\nNúmero de serie: ${datos.autoSerie}\n\nSEGUNDA. El presente contrato tendrá vigencia indefinida a partir de la fecha de firma, pudiendo cualquiera de las partes darlo por terminado con aviso previo.\n\nTERCERA. El ARRENDATARIO se compromete a realizar el pago de la renta acordada de manera puntual cada semana, los días lunes.\n\nCUARTA. El ARRENDATARIO se obliga a utilizar el vehículo únicamente para prestar servicios a través de la plataforma Uber, cuidar el vehículo como si fuera propio, reportar cualquier incidente de inmediato y no ceder el uso del vehículo a terceros.\n\nQUINTA. Cualquier daño causado al vehículo por negligencia del ARRENDATARIO será cubierto íntegramente por este.\n\nAmbas partes firman de conformidad.\n\n\n_______________________          _______________________\n      ARRENDADOR                        ARRENDATARIO\n                                    ${datos.nombre}`;
+  const arrendador='Fernando Burgos Castañeda';
+  const renta=`$${Number(datos.autoRenta).toLocaleString('es-MX')} MXN`;
+  return `CONTRATO DE ARRENDAMIENTO DE VEHÍCULO
+
+Entre: ${arrendador} en adelante "Arrendador"
+Y: ${datos.nombre}, en adelante "Arrendatario"
+Fecha de Inicio: ${datos.fechaCorta}
+Vehículo: ${datos.autoNombre}
+Año: ${datos.autoAño}
+Placas: ${datos.autoPlacas}
+No. De Serie: ${datos.autoSerie}
+
+Objeto del Contrato:
+El Arrendador cede en arrendamiento al Arrendatario el vehículo descrito anteriormente, bajo los términos y condiciones establecidos en este contrato.
+
+Estado y Mantenimiento del Vehículo:
+El vehículo se entrega en estado de funcionamiento, con los detalles mecánicos y estéticos especificados al momento de la entrega. El Arrendatario se compromete a mantener el vehículo en buenas condiciones, realizando las revisiones diarias de niveles y sometiéndose a revisiones mecánicas obligatorias, según lo acordado en el Anexo A.
+
+Revisión Mecánica Obligatoria:
+El vehículo deberá ser revisado por un mecánico autorizado a partir del siguiente mes calendario, será un lunes sí, dos consecutivos no, y así sucesivamente. Siendo esta revisión completamente obligatoria, negarse a atenderla de manera voluntaria, implicará la terminación del contrato.
+
+Responsabilidad por Reparaciones:
+El Arrendatario será responsable de los daños causados por negligencia o mal uso. Los daños por desgaste natural se resolverán según lo acordado en el Anexo B.
+
+Uso del Vehículo:
+El Arrendatario se compromete a utilizar el vehículo exclusivamente para los fines acordados, prohibiéndose el subarrendamiento. Las infracciones a esta cláusula conllevarán las sanciones detalladas en el Anexo C.
+
+Reporte de Kilometraje y Condiciones:
+El Arrendatario deberá reportar mensualmente el kilometraje, cualquier incidencia relacionada con el vehículo es al momento.
+
+Pago de Renta:
+La renta se establece en ${renta} y se pagará semanalmente cada lunes. El retraso en los pagos implicará las consecuencias detalladas en el Anexo D, así como los detalles del esquema de pago y depósito.
+
+Terminación del Contrato:
+Cualquiera de las partes puede terminar este contrato, siguiendo las condiciones del Anexo E.
+
+Disposiciones Generales:
+Este contrato se rige por las leyes del Estado de Querétaro/México. Cualquier modificación debe ser por escrito y firmada por ambas partes.
+
+
+_______________________          _______________________
+  ${arrendador}              ${datos.nombre}
+        Arrendador                         Arrendatario
+
+
+════════════════════════════════════════════════════════════════
+
+ANEXO A: DETALLES MECÁNICOS Y ESTÉTICOS DEL VEHÍCULO
+
+Este Anexo forma parte del Contrato de Arrendamiento de Vehículo entre ${arrendador} y ${datos.nombre} y describe el estado actual mecánico y estético del vehículo ${datos.autoNombre} ${datos.autoAño} PLACAS ${datos.autoPlacas} al momento de la entrega.
+
+El Arrendatario se compromete a realizar revisiones DIARIAMENTE de los niveles (aceite, agua, anticongelante), y se aclara que cualquier falla derivada de niveles mínimos de estos, siendo esto no reportado al Arrendador, será responsabilidad del Arrendatario.
+
+El Arrendatario al igual tendrá la obligación de no permitir que el nivel de combustible del vehículo baje de reserva, pues esto puede ocasionar daños en la bomba de gasolina, aclarando este punto referente a fallas en la bomba de gasolina derivado de bajos niveles de combustible, será responsabilidad del Arrendatario.
+
+El vehículo se entrega con lo siguiente:
+
+Concepto             | Funciona | Req. Atención | No funciona
+---------------------|----------|---------------|------------
+Batería              |          |               |
+Faros                |          |               |
+Ventanas             |          |               |
+Transmisión          |          |               |
+Dirección            |          |               |
+Frenos               |          |               |
+Catalizador          |          |               |
+
+Llantas:             | 1/4 | 1/2 | 3/4 | 1
+---------------------|-----|-----|-----|---
+Piloto               |     |     |     |
+Copiloto             |     |     |     |
+Pasajero P           |     |     |     |
+Pasajero CP          |     |     |     |
+
+Inventario:          | Se entrega | No se entrega
+---------------------|------------|---------------
+Llanta de refacción  |            |
+Herramienta          |            |
+Tapetes              |            |
+Espejos              |            |
+
+Firmado por:
+${arrendador}   ${datos.fechaCorta}
+${datos.nombre}   ${datos.fechaCorta}
+
+
+════════════════════════════════════════════════════════════════
+
+ANEXO B: ACUERDO DE REPARACIONES
+
+Este Acuerdo de Reparaciones forma parte del Contrato de Arrendamiento de Vehículo entre ${arrendador} y ${datos.nombre} en adelante "las Partes".
+
+Responsabilidad del Arrendatario: El Arrendatario será responsable de todas las reparaciones y costos asociados a daños causados por negligencia, mal uso o uso indebido del vehículo. Esto incluye, pero no se limita a, daños en el motor, carrocería, y sistemas eléctricos o mecánicos debido a accidentes, manejo imprudente o falta de mantenimiento adecuado.
+
+Reparaciones por Desgaste Natural: Las reparaciones necesarias debido al desgaste natural del vehículo serán absorbidas económicamente por el Arrendador, sin embargo, el Arrendatario acudirá al mecánico autorizado.
+
+Procedimiento de Reparación: En caso de necesidad de reparaciones, el Arrendatario deberá notificar inmediatamente al Arrendador y no proceder con las reparaciones sin su consentimiento acordado. Las reparaciones deberán ser realizadas en un taller autorizado por el Arrendador.
+
+Inspecciones y Mantenimiento Regular: El Arrendatario se compromete a realizar inspecciones regulares y mantenimiento preventivo del vehículo, conforme a las instrucciones del Arrendador y sugerencias del mecánico.
+
+Documentación de Reparaciones: Todas las reparaciones y/o intervenciones realizadas con un mecánico externo, se deberá documentar con fotografías la reparación, y evidencia del costo real de la reparación.
+
+Las Partes acuerdan que el incumplimiento de este Acuerdo de Reparaciones puede resultar en penalizaciones adicionales, según lo estipulado en el Contrato de Arrendamiento de Vehículo.
+
+Firmado por:
+${arrendador}   ${datos.fechaCorta}
+${datos.nombre}   ${datos.fechaCorta}
+
+
+════════════════════════════════════════════════════════════════
+
+ANEXO C: SANCIONES POR SUBARRENDAMIENTO
+
+Este documento es un anexo al Contrato de Arrendamiento de Vehículo entre ${arrendador} y ${datos.nombre} y detalla las sanciones aplicables en caso de subarrendamiento no autorizado del vehículo y/o uso indebido.
+
+Prohibición de Subarrendamiento: El Arrendatario no podrá subarrendar, prestar, o ceder el uso del vehículo a terceros en ninguna circunstancia sin el consentimiento escrito previo del Arrendador.
+
+Uso Indebido: El vehículo se arrienda exclusivamente para su uso en plataformas de transporte compartido y servicios de movilidad como DiDi, Uber, y otras similares. Queda estrictamente prohibido el uso del vehículo para cualquier otro fin, incluyendo, pero no limitado a uso personal, transporte de mercancías no autorizado, o cualquier actividad que no esté directamente relacionada con los servicios de transporte compartido.
+
+Sanciones Económicas: En caso de incumplimiento, el Arrendatario deberá pagar una penalización de un mes de pago de rentas por cada incidente de subarrendamiento no autorizado.
+
+Terminación Inmediata del Contrato: El Arrendador tendrá el derecho de terminar el contrato de arrendamiento de manera inmediata y sin previo aviso en caso de subarrendamiento no autorizado.
+
+Responsabilidad por Daños y Perjuicios: Además de la penalización económica, el Arrendatario será responsable de cualquier daño o perjuicio que resulte del subarrendamiento no autorizado.
+
+Acciones Legales: El Arrendador se reserva el derecho de emprender acciones legales adicionales para recuperar daños y perjuicios o cualquier otra compensación según lo permita la ley.
+
+Firmado por:
+${arrendador}   ${datos.fechaCorta}
+${datos.nombre}   ${datos.fechaCorta}
+
+
+════════════════════════════════════════════════════════════════
+
+ANEXO D: ESQUEMA DE PAGOS
+
+Este documento es parte integrante del Contrato de Arrendamiento de Vehículo entre ${arrendador} y ${datos.nombre} y establece las consecuencias aplicables en caso de retraso en los pagos de renta.
+
+El pago deberá realizarlo el Arrendatario obligatoriamente cada lunes semanalmente, correspondiendo ese pago a los 7 días previos de la semana, considerando las horas en las cuales el vehículo está en condiciones para trabajar, en caso de no serlo acudir inmediatamente al mecánico autorizado por el Arrendador para darle solución.
+
+El pago podrá hacerse mediante transferencia, depósito bancario, OXXO, a la siguiente cuenta BBVA:
+
+No. De Cuenta para depósito bancario: 156 049 1613
+CLABE para transferencias: 0126 8001 5604 916139
+Tarjeta para depósito en OXXO: 4152 3143 7088 3715
+Nombre: ${arrendador}
+
+Depósito: El Arrendatario deberá cubrir un depósito por ${renta} que será pagado al momento de el vehículo ser entregado por el Arrendador, a los medios anteriormente mencionados o en efectivo.
+
+Penalización por Retraso: Pasada la fecha de pago, el Arrendatario recibirá una notificación de incumplimiento, solicitando su pago inmediatamente, quedando registrado el incumplimiento.
+
+Registros de Incumplimiento: Si el Arrendatario acumula constantes y numerosos registros, a consideración del Arrendador, podrá retirar el vehículo.
+
+Falta de comunicación: Si el Arrendatario corta comunicación siendo este tratado de contactar para solicitud de pago y esto persiste por días consecutivos, el Arrendador se reserva el derecho de emprender acciones legales por robo.
+
+Terminación del Contrato: El incumplimiento continuo en el pago puede resultar en la terminación del contrato de arrendamiento, sujeto a las condiciones establecidas en el Anexo E.
+
+Acciones Legales: El Arrendador se reserva el derecho de emprender acciones legales para recuperar el pago adeudado y cualquier otra compensación según lo permita la ley.
+
+Firmado por:
+${arrendador}   ${datos.fechaCorta}
+${datos.nombre}   ${datos.fechaCorta}
+
+
+════════════════════════════════════════════════════════════════
+
+ANEXO E: CONDICIÓN DE TERMINACIÓN
+
+Este Anexo forma parte del Contrato de Arrendamiento de Vehículo entre ${arrendador} y ${datos.nombre} y establece las condiciones bajo las cuales cualquiera de las partes puede terminar el contrato.
+
+Notificación de Terminación: Cualquier parte que desee terminar el contrato deberá notificar a la otra parte con un preaviso de 7 días.
+
+Causas de Terminación Inmediata: El contrato podrá ser terminado de manera inmediata por el Arrendador y sin previo aviso en caso de:
+- Incumplimiento grave de cualquiera de las cláusulas del contrato, principalmente retraso en pagos.
+- Uso indebido del vehículo.
+- Subarrendamiento no autorizado.
+
+Devolución del Vehículo: Tras la terminación del contrato, el Arrendatario deberá devolver el vehículo en las mismas condiciones en que fue recibido, salvo el desgaste normal, en el lugar indicado por el Arrendador.
+
+Liquidación de Cuentas: Cualquier pago pendiente o adeudo deberá ser liquidado en su totalidad, se tomará en cuenta el depósito del arrendatario al momento de recibir el auto, a reservas de verificar que las condiciones del vehículo sean las que se recibió, salvo el desgaste natural.
+
+Firmado por:
+${arrendador}   ${datos.fechaCorta}
+${datos.nombre}   ${datos.fechaCorta}`;
 }
 
 function abrirModalContrato(choferId){
@@ -2146,7 +2331,9 @@ document.getElementById('btnOkContrato').addEventListener('click',()=>{
   if(!autoId)return toast('Selecciona un auto','er');
   const a=getAuto(autoId);
   const datos={nombre,fecha:new Date(fecha+'T12:00:00').toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'}),
-    autoNombre:a.nombre,autoColor:a.color||'N/D',autoPlacas:a.placas,autoSerie:a.serie||'N/D'};
+    fechaCorta:new Date(fecha+'T12:00:00').toLocaleDateString('es-MX',{year:'numeric',month:'numeric',day:'numeric'}),
+    autoNombre:a.nombre,autoColor:a.color||'N/D',autoPlacas:a.placas,autoSerie:a.serie||'N/D',
+    autoAño:a.año||'N/D',autoRenta:a.renta||2400};
   const texto=generarTextoContrato(datos);
   const ct={id:uid(),choferId:_contratoChoferId,nombreCompleto:nombre,fechaContrato:fecha,
     autoId,estado:'pendiente_firma',fechaGen:today(),texto,_ts:Date.now()};
