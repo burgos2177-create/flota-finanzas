@@ -172,7 +172,7 @@ tr.d3{background:rgba(248,113,113,.04)}
 .bpa{background:rgba(251,191,36,.12);color:var(--ye);border:1px solid rgba(251,191,36,.3)}
 .bct{background:rgba(96,165,250,.1);color:var(--bl);border:1px solid rgba(96,165,250,.3)}
 /* CONTRACT PRINT */
-@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:fixed;left:0;top:0;width:100%;background:#fff;padding:40px 60px;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.9;color:#000}}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{display:block;position:fixed;left:0;top:0;width:100%;background:#fff;padding:40px 60px;font-family:'Times New Roman',serif;font-size:12pt;line-height:1.9;color:#000;white-space:pre-wrap}}
 #printArea{display:none}
 .contract-preview{background:#fff;color:#111;padding:28px 32px;border-radius:8px;font-family:'Times New Roman',serif;font-size:13px;line-height:1.9;white-space:pre-wrap;max-height:52vh;overflow-y:auto;border:1px solid #ccc}
 /* INAC PANEL */
