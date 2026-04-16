@@ -456,7 +456,7 @@ tr.d3{background:rgba(248,113,113,.04)}
   </div>
   <div class="card" style="padding:0">
     <div class="tw"><table class="stbl"><thead><tr>
-      <th>Semana</th><th>Auto</th><th>Chofer</th><th>Ingresos</th><th>Egresos</th><th>Días inact.</th><th>Hrs perdidas</th><th>$ Inactividad</th><th>Balance</th>
+      <th>Auto</th><th>Chofer</th><th>Ingresos</th><th>Egresos</th><th>Días inact.</th><th>Hrs perdidas</th><th>$ Inactividad</th><th>Balance</th>
     </tr></thead><tbody id="tSemanal"></tbody></table></div>
   </div>
   <div class="sr" id="semTotales" style="margin-top:14px"></div>
@@ -821,6 +821,7 @@ function save(){
   S.set('ff_choferes',CHOFERES);S.set('ff_per',PERIODOS);
   S.set('ff_inac',INACTIVIDAD);
   S.set('ff_contratos',CONTRATOS);
+  S.set('ff_docs',DOCS);
   S.set('ff_talleres',TALLERES);
   // Marcar timestamp local inmediatamente para proteger cambios antes del sync
   S.set('ff_local_ts',Date.now());
@@ -1829,7 +1830,15 @@ document.getElementById('btnOkChofer').addEventListener('click',()=>{
 // ═══════════════════════════════════════════════════════════
 // RESUMEN SEMANAL
 // ═══════════════════════════════════════════════════════════
-let _semMes=new Date().getMonth(),_semYear=new Date().getFullYear();
+// ── Semana actual (lunes de la semana en curso) ──
+function _getMonday(d){
+  const r=new Date(d);const dow=r.getDay();
+  r.setDate(r.getDate()-(dow===0?6:dow-1));r.setHours(12,0,0,0);return r;
+}
+function _isoDate(d){
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+let _semWeekMon=_getMonday(new Date());
 
 function getWeeksOfMonth(year,month){
   const first=new Date(year,month,1),last=new Date(year,month+1,0);
@@ -1858,45 +1867,48 @@ function calcSemanaAuto(autoId,ini,fin){
 }
 
 function renderSemanal(){
-  document.getElementById('semLabel').textContent=`${MES[_semMes].toUpperCase()} ${_semYear}`;
+  const finDate=new Date(_semWeekMon);finDate.setDate(_semWeekMon.getDate()+6);
+  const ini=_isoDate(_semWeekMon),fin=_isoDate(finDate);
+  const label=`${_semWeekMon.getDate()} ${MES[_semWeekMon.getMonth()]} – ${finDate.getDate()} ${MES[finDate.getMonth()]} ${finDate.getFullYear()}`;
+  document.getElementById('semLabel').textContent=label;
+
   const selAuto=document.getElementById('semAuto');
   const prevVal=selAuto.value;
   selAuto.innerHTML='<option value="">Todos los autos</option>'+
     AUTOS.map(a=>`<option value="${a.id}"${a.id===prevVal?' selected':''}>${a.nombre}</option>`).join('');
   const fAuto=selAuto.value;
-  const weeks=getWeeksOfMonth(_semYear,_semMes);
   const autos=fAuto?AUTOS.filter(a=>a.id===fAuto):AUTOS;
   const tbody=document.getElementById('tSemanal');
   let tIng=0,tEgr=0,tInac=0,tHrs=0;
   let rows='';
-  weeks.forEach(w=>{
-    autos.forEach(a=>{
-      const d=calcSemanaAuto(a.id,w.ini,w.fin);
-      const p=getPeriodoActivo(a.id);const ch=p?getChofer(p.choferId):null;
-      tIng+=d.ingresos;tEgr+=d.egresos;tInac+=d.costoInac;tHrs+=d.hrsInac;
-      const hasData=d.ingresos||d.egresos||d.diasInac;
-      if(!hasData&&autos.length>1)return;
-      rows+=`<tr>
-        <td class="mo">${w.label}</td>
-        <td style="font-weight:500;color:var(--tx)">${a.nombre}</td>
-        <td>${ch?ch.nombre:'—'}</td>
-        <td class="ap">${d.ingresos?fmt(d.ingresos):'—'}</td>
-        <td class="an">${d.egresos?fmt(d.egresos):'—'}</td>
-        <td class="mo">${d.diasInac||'—'}</td>
-        <td class="mo">${d.hrsInac||'—'}</td>
-        <td class="an">${d.costoInac?fmt(-d.costoInac):'—'}</td>
-        <td class="${d.balance>=0?'ap':'an'} ab">${fmt(d.balance)}</td>
-      </tr>`;
-    });
+
+  autos.forEach(a=>{
+    const d=calcSemanaAuto(a.id,ini,fin);
+    const p=getPeriodoActivo(a.id);const ch=p?getChofer(p.choferId):null;
+    tIng+=d.ingresos;tEgr+=d.egresos;tInac+=d.costoInac;tHrs+=d.hrsInac;
+    const hasData=d.ingresos||d.egresos||d.diasInac;
+    if(!hasData&&autos.length>1)return;
+    rows+=`<tr>
+      <td style="font-weight:500;color:var(--tx)">${a.nombre}</td>
+      <td>${ch?ch.nombre:'—'}</td>
+      <td class="ap">${d.ingresos?fmt(d.ingresos):'—'}</td>
+      <td class="an">${d.egresos?fmt(d.egresos):'—'}</td>
+      <td class="mo">${d.diasInac||'—'}</td>
+      <td class="mo">${d.hrsInac||'—'}</td>
+      <td class="an">${d.costoInac?fmt(-d.costoInac):'—'}</td>
+      <td class="${d.balance>=0?'ap':'an'} ab">${fmt(d.balance)}</td>
+    </tr>`;
   });
+
   const bal=tIng+tEgr;
-  if(rows){
-    rows+=`<tr class="totrow"><td colspan="3" style="text-align:right">TOTAL</td>
+  if(rows&&autos.length>1){
+    rows+=`<tr class="totrow"><td style="text-align:right">TOTAL</td>
+      <td></td>
       <td class="ap">${fmt(tIng)}</td><td class="an">${fmt(tEgr)}</td>
       <td></td><td class="mo">${tHrs||''}</td><td class="an">${tInac?fmt(-tInac):''}</td>
       <td class="${bal>=0?'ap':'an'} ab">${fmt(bal)}</td></tr>`;
-  } else {
-    rows='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--tx3)">Sin datos para este mes.</td></tr>';
+  } else if(!rows){
+    rows='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--tx3)">Sin datos para esta semana.</td></tr>';
   }
   tbody.innerHTML=rows;
   document.getElementById('semTotales').innerHTML=`
@@ -1906,8 +1918,8 @@ function renderSemanal(){
     <div class="sc"><div class="sl">Balance</div><div class="sv ${bal>=0?'g':'r'}">${fmt(bal)}</div></div>`;
 }
 
-document.getElementById('semPrev').addEventListener('click',()=>{_semMes--;if(_semMes<0){_semMes=11;_semYear--;}renderSemanal();});
-document.getElementById('semNext').addEventListener('click',()=>{_semMes++;if(_semMes>11){_semMes=0;_semYear++;}renderSemanal();});
+document.getElementById('semPrev').addEventListener('click',()=>{_semWeekMon.setDate(_semWeekMon.getDate()-7);renderSemanal();});
+document.getElementById('semNext').addEventListener('click',()=>{_semWeekMon.setDate(_semWeekMon.getDate()+7);renderSemanal();});
 document.getElementById('semAuto').addEventListener('change',renderSemanal);
 
 // ═══════════════════════════════════════════════════════════
@@ -1932,6 +1944,8 @@ function renderMensual(){
 
     let inacCosto=0;
     weeks.forEach(w=>{
+      // Solo contar semanas que inician en este mes para evitar doble conteo
+      if(!w.ini.startsWith(mesStr))return;
       const inac=INACTIVIDAD.filter(i=>i.autoId===a.id&&i.semana===`${w.ini}|${w.fin}`);
       inacCosto+=inac.reduce((s,i)=>s+(a.renta/7)*Number(i.dias),0);
     });
