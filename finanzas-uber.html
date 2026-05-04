@@ -7,6 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <style>
 :root{--bg:#0f1117;--sur:#181c27;--sur2:#1e2334;--bor:rgba(255,255,255,0.07);--bor2:rgba(255,255,255,0.13);--tx:#e8eaf0;--tx2:#8b90a0;--tx3:#555a6e;--gr:#4ade80;--grd:rgba(74,222,128,.12);--grb:rgba(74,222,128,.3);--re:#f87171;--red:rgba(248,113,113,.12);--reb:rgba(248,113,113,.3);--ye:#fbbf24;--yed:rgba(251,191,36,.12);--or:#fb923c;--ord:rgba(251,146,60,.12);--bl:#60a5fa;--bld:rgba(96,165,250,.1);--r:10px;--mo:'DM Mono',monospace;--fn:'Sora',sans-serif;--nw:230px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -205,6 +208,40 @@ tr.d3{background:rgba(248,113,113,.04)}
 /* SALDO FILTER PILLS */
 .scat-pill{padding:4px 10px;border-radius:20px;font-size:11px;font-family:var(--mo);cursor:pointer;border:1px solid var(--bor2);color:var(--tx2);transition:all .15s;user-select:none;white-space:nowrap}
 .scat-pill.on{opacity:.4;text-decoration:line-through}
+/* MANTENIMIENTO 3D */
+.mant-wrap{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-top:14px}
+@media(max-width:980px){.mant-wrap{grid-template-columns:1fr}}
+.mant-viewer{position:relative;background:linear-gradient(180deg,#0a0d14 0%,#141826 100%);border:1px solid var(--bor);border-radius:var(--r);height:520px;overflow:hidden}
+.mant-viewer canvas{display:block;width:100%;height:100%;cursor:grab}
+.mant-viewer canvas:active{cursor:grabbing}
+.mant-tools{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+.mant-tools .btn{background:rgba(15,17,23,.85);border:1px solid var(--bor2);color:var(--tx);font-size:11px;padding:5px 10px}
+.mant-tools .btn.on{background:var(--grd);color:var(--gr);border-color:var(--grb)}
+.mant-hint{position:absolute;bottom:10px;left:10px;right:10px;font-size:10px;font-family:var(--mo);color:var(--tx3);letter-spacing:.6px;pointer-events:none;text-align:center}
+.mant-tip{position:absolute;background:var(--sur2);border:1px solid var(--bor2);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--tx);pointer-events:none;display:none;z-index:6;white-space:nowrap;font-family:var(--mo)}
+.mant-panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px;max-height:520px;overflow-y:auto}
+@media(max-width:980px){.mant-panel{max-height:none}}
+.mant-cats{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
+.mant-cat{padding:5px 11px;border-radius:20px;font-size:11px;font-family:var(--mo);cursor:pointer;border:1px solid var(--bor2);color:var(--tx2);transition:all .15s;user-select:none}
+.mant-cat:hover{color:var(--tx);border-color:var(--bor2)}
+.mant-cat.on{background:var(--grd);color:var(--gr);border-color:var(--grb)}
+.mant-svc{background:var(--sur2);border:1px solid var(--bor2);border-radius:8px;padding:11px 13px;margin-bottom:8px}
+.mant-svc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.mant-svc-name{font-size:13px;font-weight:500;color:var(--tx)}
+.mant-svc-last{font-family:var(--mo);font-size:11px;color:var(--tx3);margin-top:3px}
+.mant-svc-last.fresh{color:var(--gr)}
+.mant-svc-last.warn{color:var(--ye)}
+.mant-svc-last.old{color:var(--or)}
+.mant-svc-hist{margin-top:10px;display:none}
+.mant-svc.exp .mant-svc-hist{display:block}
+.mant-hist-row{display:flex;justify-content:space-between;font-family:var(--mo);font-size:11px;color:var(--tx2);padding:5px 0;border-top:1px solid var(--bor)}
+.mant-hist-row:first-child{border-top:none}
+.mant-hist-meta{color:var(--tx3);font-size:10px}
+.mant-empty-svc{font-family:var(--mo);font-size:11px;color:var(--tx3);font-style:italic;padding:6px 0}
+.mant-part-head{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--grd);border:1px solid var(--grb);border-radius:8px;margin-bottom:12px}
+.mant-part-head .ph-ico{font-size:22px}
+.mant-part-head .ph-nom{font-size:14px;font-weight:600;color:var(--gr)}
+.mant-part-head .ph-sub{font-size:11px;color:var(--tx2);font-family:var(--mo)}
 </style>
 </head>
 <body>
@@ -218,6 +255,7 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="ns">Registros</div>
   <div class="ni" data-pg="bitacora">≡ &nbsp;Bitácora Global</div>
   <div class="ni" data-pg="autos">◎ &nbsp;Mis Autos</div>
+  <div class="ni" data-pg="mantenimiento">🛠 &nbsp;Mantenimiento</div>
   <div class="ni" data-pg="choferes">👤 &nbsp;Choferes</div>
   <div class="ni" data-pg="talleres">🔧 &nbsp;Talleres/Proveedores</div>
   <div class="ns">Reportes</div>
@@ -384,6 +422,25 @@ tr.d3{background:rgba(248,113,113,.04)}
     <div class="card" style="padding:0">
       <div class="tw"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Categoría</th><th>Concepto</th><th>Retraso</th><th>Monto</th><th>Saldo acum.</th><th>Nota</th><th></th></tr></thead><tbody id="tBitAuto"></tbody></table></div>
     </div>
+  </div>
+</div>
+
+<!-- MANTENIMIENTO 3D -->
+<div id="pg-mantenimiento" class="pg">
+  <div class="fb m16">
+    <div><div class="pt">Mantenimiento</div><div class="ps" style="margin:0">Vista 3D del auto. Click en cualquier parte para ver su historial de servicio.</div></div>
+    <select id="mantAuto" style="min-width:180px"></select>
+  </div>
+  <div class="mant-wrap">
+    <div class="mant-viewer" id="mantViewer">
+      <div class="mant-tools">
+        <button class="btn" id="btnMantHood">👁 Rayos X</button>
+        <button class="btn" id="btnMantReset">↻ Vista</button>
+      </div>
+      <div class="mant-tip" id="mantTip"></div>
+      <div class="mant-hint">Arrastra para rotar · Rueda del mouse para acercar · Click en una parte</div>
+    </div>
+    <div class="mant-panel" id="mantPanel"></div>
   </div>
 </div>
 
@@ -776,6 +833,35 @@ tr.d3{background:rgba(248,113,113,.04)}
 </div>
 
 <!-- MODAL CONFIRMAR -->
+<!-- MODAL MANTENIMIENTO ENTRY -->
+<div class="mb" id="modalMant">
+  <div class="md">
+    <div class="mt" id="modalMantTit">Registrar servicio</div>
+    <div id="modalMantSub" style="font-family:var(--mo);font-size:11px;color:var(--tx3);margin-top:-12px;margin-bottom:14px;letter-spacing:.5px"></div>
+    <div class="fg">
+      <div class="fo full"><label>Vincular con movimiento de bitácora (opcional)</label>
+        <select id="mtMov"><option value="">— Crear registro independiente —</option></select>
+      </div>
+      <div class="fo"><label>Fecha *</label><input type="date" id="mtFecha"></div>
+      <div class="fo"><label>Kilometraje</label><input type="number" id="mtKm" placeholder="65000"></div>
+      <div class="fo"><label>Costo ($)</label><input type="number" id="mtCosto" placeholder="450"></div>
+      <div class="fo"><label>Taller / Proveedor</label><select id="mtTaller"><option value="">— Sin taller —</option></select></div>
+      <div class="fo full"><label>Nota</label><input type="text" id="mtNota" placeholder="Marca de aceite, observaciones..."></div>
+    </div>
+    <div id="mtMovInfo" style="display:none;background:var(--bld);border:1px solid rgba(96,165,250,.3);border-radius:7px;padding:8px 11px;margin-top:-4px;margin-bottom:10px;font-size:11px;font-family:var(--mo);color:var(--bl)">📋 Vinculado — los datos se sincronizan con el movimiento de bitácora.</div>
+    <input type="hidden" id="mtPart">
+    <input type="hidden" id="mtServ">
+    <input type="hidden" id="mtId">
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:8px">
+      <button class="btn bd" id="btnDelMant" style="display:none">Eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn bg" id="btnCancelMant">Cancelar</button>
+        <button class="btn bp" id="btnOkMant">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="mb" id="modalConfirm">
   <div class="md" style="max-width:380px;text-align:center">
     <div class="mt" id="confirmMsg">¿Estás seguro?</div>
@@ -815,6 +901,7 @@ let INACTIVIDAD= S.get('ff_inac',[]);
 let CONTRATOS  = S.get('ff_contratos',[]);
 let DOCS       = S.get('ff_docs',[]);
 let TALLERES   = S.get('ff_talleres',[]);
+let MANTENIMIENTO = S.get('ff_mant',{});
 
 function save(){
   S.set('ff_autos',AUTOS);S.set('ff_movs',MOVS);
@@ -823,6 +910,7 @@ function save(){
   S.set('ff_contratos',CONTRATOS);
   S.set('ff_docs',DOCS);
   S.set('ff_talleres',TALLERES);
+  S.set('ff_mant',MANTENIMIENTO);
   // Marcar timestamp local inmediatamente para proteger cambios antes del sync
   S.set('ff_local_ts',Date.now());
   syncToCloud();
@@ -854,6 +942,7 @@ function _applyCloudData(d){
   if(d.CONTRATOS){CONTRATOS=d.CONTRATOS;S.set('ff_contratos',CONTRATOS);}
   if(d.DOCS){DOCS=d.DOCS;S.set('ff_docs',DOCS);}
   if(d.TALLERES){TALLERES=d.TALLERES;S.set('ff_talleres',TALLERES);}
+  if(d.MANTENIMIENTO){MANTENIMIENTO=d.MANTENIMIENTO;S.set('ff_mant',MANTENIMIENTO);}
 }
 
 function _markSynced(){
@@ -897,6 +986,7 @@ function renderCurrentPage(){
   else if(id==='analisis')renderAnalisis();
   else if(id==='talleres')renderTalleres();
   else if(id==='saldo')renderSaldo();
+  else if(id==='mantenimiento')renderMantPanel();
 }
 
 async function loadFromCloud(){
@@ -928,7 +1018,7 @@ function syncToCloud(force=false){
     setCloudDot('syncing');
     try{
       const ts=Date.now();
-      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,_ts:ts});
+      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
     }catch(e){console.error('syncToCloud:',e);setCloudDot('error');}
@@ -1040,6 +1130,7 @@ function goTo(pg){
   document.getElementById('pg-'+pg).classList.add('on');
   document.querySelectorAll('.ni[data-pg="'+pg+'"]').forEach(el=>el.classList.add('on'));
   document.getElementById('nav').classList.remove('on');
+  if(pg!=='mantenimiento' && typeof disposeMant3D==='function') disposeMant3D();
   if(pg==='dashboard')renderDash();
   if(pg==='movimiento')initMov();
   if(pg==='bitacora')renderBitacora();
@@ -1050,6 +1141,7 @@ function goTo(pg){
   if(pg==='mensual')renderMensual();
   if(pg==='analisis')renderAnalisis();
   if(pg==='saldo')renderSaldo();
+  if(pg==='mantenimiento')renderMant();
 }
 
 document.querySelectorAll('.ni[data-pg]').forEach(el=>{
@@ -3130,6 +3222,894 @@ document.querySelectorAll('.ptab').forEach(el=>{
     document.querySelectorAll('.ptab').forEach(t=>t.classList.toggle('on',t.dataset.period===_saldoPeriod));
     drawSaldoChart();
   });
+});
+
+// ═══════════════════════════════════════════════════════════
+// MANTENIMIENTO 3D
+// ═══════════════════════════════════════════════════════════
+const PARTES = {
+  motor:       {nombre:'Motor',                 icon:'⚙️', servicios:['Aceite','Filtro de aceite','Filtro de aire','Bujías','Banda de accesorios','Anticongelante']},
+  bateria:     {nombre:'Batería',               icon:'🔋', servicios:['Cambio de batería','Limpieza de bornes']},
+  faros:       {nombre:'Faros',                 icon:'💡', servicios:['Altas','Bajas','Direccionales','Stop','Niebla','Reversa']},
+  parabrisas:  {nombre:'Parabrisas / Limpia.',  icon:'🪟', servicios:['Plumas delanteras','Pluma trasera','Motor limpiaparabrisas','Líquido lavaparabrisas']},
+  llanta_fl:   {nombre:'Llanta delantera izq.', icon:'🛞', servicios:['Llanta','Balatas','Disco/Tambor','Balero','Presión']},
+  llanta_fr:   {nombre:'Llanta delantera der.', icon:'🛞', servicios:['Llanta','Balatas','Disco/Tambor','Balero','Presión']},
+  llanta_rl:   {nombre:'Llanta trasera izq.',   icon:'🛞', servicios:['Llanta','Balatas','Disco/Tambor','Balero','Presión']},
+  llanta_rr:   {nombre:'Llanta trasera der.',   icon:'🛞', servicios:['Llanta','Balatas','Disco/Tambor','Balero','Presión']},
+  transmision: {nombre:'Transmisión',           icon:'🔧', servicios:['Aceite caja','Embrague']},
+  suspension:  {nombre:'Suspensión',            icon:'🔩', servicios:['Amortiguadores delanteros','Amortiguadores traseros','Rótulas','Bujes']},
+  electrico:   {nombre:'Sistema eléctrico',     icon:'⚡', servicios:['Alternador','Computadora (ECU)','Marcha / Motor de arranque','Bobinas de encendido','Sensor MAF','Sensor O2','Sensor cigüeñal/levas','Fusibles','Cableado / arnés','Cilindro de encendido','Relés']},
+  general:     {nombre:'General',               icon:'🛠️', servicios:['Alineación','Balanceo','Verificación','Afinación','Líquido de frenos']},
+};
+
+// TTL — intervalos recomendados por servicio (km y/o días)
+const TTL = {
+  // Motor
+  'Aceite':                     {km:5000,  days:90},
+  'Filtro de aceite':           {km:10000, days:180},
+  'Filtro de aire':             {km:15000, days:365},
+  'Bujías':                     {km:30000, days:730},
+  'Banda de accesorios':        {km:60000, days:1825},
+  'Anticongelante':             {km:40000, days:730},
+  // Batería
+  'Cambio de batería':          {km:0,     days:1095},
+  'Limpieza de bornes':         {km:0,     days:365},
+  // Faros
+  'Altas':                      {km:0,     days:1825},
+  'Bajas':                      {km:0,     days:1825},
+  'Direccionales':              {km:0,     days:2555},
+  'Stop':                       {km:0,     days:2555},
+  'Niebla':                     {km:0,     days:2555},
+  'Reversa':                    {km:0,     days:2555},
+  // Parabrisas
+  'Plumas delanteras':          {km:0,     days:365},
+  'Pluma trasera':              {km:0,     days:365},
+  'Motor limpiaparabrisas':     {km:0,     days:1825},
+  'Líquido lavaparabrisas':     {km:0,     days:60},
+  // Llantas
+  'Llanta':                     {km:40000, days:1460},
+  'Balatas':                    {km:30000, days:730},
+  'Disco/Tambor':               {km:60000, days:1460},
+  'Balero':                     {km:80000, days:1825},
+  'Presión':                    {km:0,     days:30},
+  // Transmisión
+  'Aceite caja':                {km:60000, days:730},
+  'Embrague':                   {km:80000, days:1825},
+  // Suspensión
+  'Amortiguadores delanteros':  {km:60000, days:1460},
+  'Amortiguadores traseros':    {km:60000, days:1460},
+  'Rótulas':                    {km:80000, days:1825},
+  'Bujes':                      {km:80000, days:1825},
+  // Eléctrico
+  'Alternador':                 {km:150000,days:2555},
+  'Computadora (ECU)':          {km:0,     days:3650},
+  'Marcha / Motor de arranque': {km:120000,days:2555},
+  'Bobinas de encendido':       {km:80000, days:1825},
+  'Sensor MAF':                 {km:100000,days:1825},
+  'Sensor O2':                  {km:80000, days:1460},
+  'Sensor cigüeñal/levas':      {km:120000,days:2190},
+  'Fusibles':                   {km:0,     days:1825},
+  'Cableado / arnés':           {km:0,     days:3650},
+  'Cilindro de encendido':      {km:0,     days:3650},
+  'Relés':                      {km:0,     days:1825},
+  // General
+  'Alineación':                 {km:15000, days:365},
+  'Balanceo':                   {km:15000, days:365},
+  'Verificación':               {km:0,     days:180},
+  'Afinación':                  {km:30000, days:730},
+  'Líquido de frenos':          {km:50000, days:730},
+};
+function srvUsedPct(autoId, parteId, srv){
+  const last = lastMant(autoId, parteId, srv);
+  const ttl = TTL[srv];
+  if(!last || !ttl || !ttl.days) return -1;
+  const days = (Date.now() - new Date(last.fecha).getTime())/86400000;
+  return days/ttl.days;
+}
+function partHealthState(autoId, parteId){
+  const part = PARTES[parteId];
+  if(!part) return 'gray';
+  let hasData=false, worst=0;
+  part.servicios.forEach(srv=>{
+    const pct = srvUsedPct(autoId, parteId, srv);
+    if(pct>=0){ hasData=true; worst=Math.max(worst,pct); }
+  });
+  if(!hasData) return 'gray';
+  if(worst<.5) return 'green';
+  if(worst<.85) return 'yellow';
+  return 'red';
+}
+function healthHex(state){
+  return state==='green'?0x4ade80 : state==='yellow'?0xfbbf24 : state==='red'?0xef4444 : 0x000000;
+}
+function applyHealthColors(){
+  if(!mant3D || !mant3D._meshes || !mant3D._autoId) return;
+  const aId = mant3D._autoId;
+  const byPart = {};
+  mant3D._meshes.forEach(m=>{
+    const pid = m.userData.partId;
+    if(!pid || m.userData._isHalo) return;
+    (byPart[pid] = byPart[pid]||[]).push(m);
+  });
+  // 1) Tint en mallas procedurales (motor/batería/alternador/ECU) — solo si tienen emissive estándar
+  Object.entries(byPart).forEach(([pid, meshes])=>{
+    const state = partHealthState(aId, pid);
+    const hex = healthHex(state);
+    meshes.forEach(m=>{
+      if(!m.material || !m.material.emissive) return;
+      // Solo tocar materiales procedurales (no del GLB)
+      if(!m.material.userData || !m.material.userData._proc) return;
+      if(mant3D._selectedPart === pid){
+        m.material.emissive.setHex(0x4ade80);
+        m.material.emissiveIntensity = .85;
+      } else {
+        m.material.emissive.setHex(hex);
+        m.material.emissiveIntensity = state==='gray'?0:.55;
+      }
+    });
+  });
+  // 2) Halos — visibilidad y color según estado
+  if(mant3D._halos){
+    mant3D._halos.forEach(h=>{
+      const pid = h.userData.partId;
+      const state = partHealthState(aId, pid);
+      const isSel = mant3D._selectedPart === pid;
+      let opacity = 0;
+      let hex = healthHex(state);
+      if(isSel){ opacity = .28; if(state==='gray') hex = 0x4ade80; }
+      else if(state==='red')    opacity = .22;
+      else if(state==='yellow') opacity = .15;
+      else if(state==='green')  opacity = .07;
+      h.material.color.setHex(hex);
+      h.material.opacity = opacity;
+      h.visible = opacity > 0;
+    });
+  }
+}
+
+let mant3D = null;
+function _resetMant(){mant3D={scene:null,camera:null,renderer:null,controls:null,raycaster:null,_meshes:[],_bodyMeshes:[],_xray:false,_animFrame:null,_autoId:null,_selectedPart:null,_highlighted:[]};}
+_resetMant();
+
+function resolveMantEntry(e){
+  if(!e) return e;
+  if(!e.movId) return e;
+  const mov = MOVS.find(m=>m.id===e.movId);
+  if(!mov) return {...e, _linkLost:true};
+  return {
+    ...e,
+    fecha: mov.fecha||e.fecha,
+    costo: Math.abs(mov.monto||0)||e.costo,
+    tallerId: mov.proveedorId||e.tallerId,
+    nota: (mov.concepto||'')+(mov.nota?' — '+mov.nota:''),
+    _linked: true,
+    _movRef: mov
+  };
+}
+function getMantList(autoId, parteId, servicio){
+  const arr = (MANTENIMIENTO[autoId]?.[parteId])||[];
+  const filt = servicio ? arr.filter(e=>e.servicio===servicio) : arr;
+  return filt.map(resolveMantEntry);
+}
+function lastMant(autoId, parteId, servicio){
+  const arr = getMantList(autoId, parteId, servicio).slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  return arr[0]||null;
+}
+
+function disposeMant3D(){
+  if(!mant3D) return;
+  if(mant3D._animFrame) cancelAnimationFrame(mant3D._animFrame);
+  if(mant3D.renderer){
+    if(mant3D.renderer.domElement && mant3D.renderer.domElement.parentNode){
+      mant3D.renderer.domElement.parentNode.removeChild(mant3D.renderer.domElement);
+    }
+    mant3D.renderer.dispose && mant3D.renderer.dispose();
+  }
+  if(mant3D.scene){
+    mant3D.scene.traverse(o=>{
+      if(o.geometry) o.geometry.dispose();
+      if(o.material){
+        if(Array.isArray(o.material)) o.material.forEach(m=>m.dispose());
+        else o.material.dispose();
+      }
+    });
+  }
+  if(mant3D.controls && mant3D.controls.dispose) mant3D.controls.dispose();
+  _resetMant();
+}
+
+function _bodyMat(color=0xa8aebd, opacity=.30){
+  return new THREE.MeshStandardMaterial({color, metalness:.15, roughness:.55, transparent:true, opacity, depthWrite:false});
+}
+function _glassMat(opacity=.40){
+  return new THREE.MeshStandardMaterial({color:0x1e293b, metalness:.3, roughness:.1, transparent:true, opacity, depthWrite:false});
+}
+function _partMat(color){
+  const m = new THREE.MeshStandardMaterial({color, metalness:.3, roughness:.5, emissive:0x000000, emissiveIntensity:.55});
+  m.userData = m.userData || {}; m.userData._proc = true;
+  return m;
+}
+function _bodyP(g, geom, x, y, z, mat){
+  const m = new THREE.Mesh(geom, mat||_bodyMat());
+  m.position.set(x,y,z);
+  mant3D._bodyMeshes.push(m);
+  g.add(m);
+  return m;
+}
+function _partP(g, geom, x, y, z, partId, color){
+  const m = new THREE.Mesh(geom, _partMat(color));
+  m.position.set(x,y,z);
+  m.userData.partId = partId;
+  mant3D._meshes.push(m);
+  g.add(m);
+  return m;
+}
+
+// Identifica partes del modelo GLB por NOMBRE DEL MATERIAL + posición Y
+function _tagModelParts(root){
+  const meshes = [];
+  root.traverse(o=>{ if(o.isMesh) meshes.push(o); });
+  if(!meshes.length) return;
+  meshes.forEach(o=>{
+    const matName = (o.material?.name||'').toLowerCase();
+    const bb = new THREE.Box3().setFromObject(o);
+    const cy = (bb.min.y + bb.max.y)/2;
+    let pid = null;
+    if(/^(refract|headlamp)/.test(matName))            pid = 'faros';       // reflectores
+    else if(/^(r_glass|o_glass)/.test(matName))        pid = 'faros';       // calaveras/direccionales
+    else if(/^(d_gass|d_glass)/.test(matName))         pid = 'parabrisas';  // vidrios oscuros (cabina)
+    else if(/^glass$/.test(matName))                   pid = cy > 0.95 ? 'parabrisas' : 'faros'; // glass alto = parabrisas, bajo = cover de faro
+    if(pid){
+      o.userData.partId = pid;
+      mant3D._meshes.push(o);
+    } else {
+      mant3D._bodyMeshes.push(o);
+    }
+  });
+}
+
+// Detecta orientación del modelo (frente debe ser +X) según posición de faros
+function _alignModelOrientation(model){
+  const heads = [];
+  model.traverse(o=>{
+    if(o.isMesh){
+      const mat = (o.material?.name||'').toLowerCase();
+      if(/^(refract|d_gass|headlamp)/.test(mat)) heads.push(o);
+    }
+  });
+  if(!heads.length) return;
+  let avgX = 0;
+  heads.forEach(h=>{
+    const bb = new THREE.Box3().setFromObject(h);
+    avgX += (bb.min.x + bb.max.x)/2;
+  });
+  avgX /= heads.length;
+  if(avgX < 0){
+    // Faros están en -X → frente a -X. Rotar 180° para alinear con +X.
+    model.rotation.y += Math.PI;
+    model.updateMatrixWorld(true);
+  }
+}
+
+// Detecta qué parte se clickeó/hovereó según userData o material+posición
+function _detectPid(hit){
+  const obj = hit.object;
+  if(obj.userData && obj.userData.partId) return obj.userData.partId;
+  const matName = (obj.material?.name||'').toLowerCase();
+  const p = hit.point;
+  if(/^(refract|headlamp|r_glass|o_glass)/.test(matName)) return 'faros';
+  if(/^(d_gass|d_glass)/.test(matName)) return 'parabrisas';
+  if(/^glass$/.test(matName)) return p.y > 0.95 ? 'parabrisas' : 'faros';
+  // Llantas: silver/black cerca del piso → cuadrante por hit.point
+  if(p.y < .80 && (/^silver/.test(matName) || /^(black|black_m)$/.test(matName))){
+    const isFront = p.x > 0;
+    const isRight = p.z > 0;
+    return isFront ? (isRight?'llanta_fr':'llanta_fl') : (isRight?'llanta_rr':'llanta_rl');
+  }
+  return null;
+}
+
+// Construye motor + batería + alternador + ECU + transmisión en el cofre
+function _buildEngineBay(group, bayCenter){
+  const cx = bayCenter.x, cy = bayCenter.y, cz = bayCenter.z;
+  function partP(geom, x, y, z, partId, color){
+    const m = new THREE.Mesh(geom, _partMat(color));
+    m.position.set(cx+x, cy+y, cz+z);
+    m.userData.partId = partId;
+    mant3D._meshes.push(m);
+    group.add(m);
+    return m;
+  }
+  // Motor
+  partP(new THREE.BoxGeometry(.55,.30,.70), 0, 0, 0, 'motor', 0x4a505c);
+  // Batería
+  partP(new THREE.BoxGeometry(.20,.20,.22), -.32, .02, .25, 'bateria', 0x808a9a);
+  // Alternador (cilindro lateral)
+  const altern = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.14, 16), _partMat(0xa0a8b8));
+  altern.rotation.z = Math.PI/2; altern.position.set(cx+.05, cy, cz-.30);
+  altern.userData.partId = 'electrico';
+  mant3D._meshes.push(altern); group.add(altern);
+  // ECU
+  partP(new THREE.BoxGeometry(.16,.10,.20), -.30, -.02, -.25, 'electrico', 0x404858);
+  // Transmisión (caja detrás del motor, pegada a él)
+  partP(new THREE.BoxGeometry(.40,.26,.34), -.45, -.02, .05, 'transmision', 0x5a606e);
+  // Eje de salida (cilindro horizontal hacia atrás, decorativo)
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.55, 10), _partMat(0x4a505c));
+  axle.rotation.z = Math.PI/2; axle.position.set(cx-.85, cy-.05, cz+.05);
+  axle.userData.partId = 'transmision';
+  mant3D._meshes.push(axle); group.add(axle);
+}
+
+// Suspensión: 4 amortiguadores con resorte en cada esquina (dentro del body)
+function _buildSuspension(scene){
+  [
+    {x: 1.25, z: .60}, {x: 1.25, z:-.60},
+    {x:-1.25, z: .60}, {x:-1.25, z:-.60},
+  ].forEach(p=>{
+    // Amortiguador (cilindro fino central)
+    const shock = new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.40, 12), _partMat(0x4a505c));
+    shock.position.set(p.x, .60, p.z);
+    shock.userData.partId = 'suspension';
+    mant3D._meshes.push(shock); scene.add(shock);
+    // Resorte (cilindro envolvente más ancho)
+    const spring = new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.28, 14), _partMat(0xa8b0bd));
+    spring.position.set(p.x, .60, p.z);
+    spring.userData.partId = 'suspension';
+    mant3D._meshes.push(spring); scene.add(spring);
+    // Plato superior (montura)
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.03, 12), _partMat(0x707682));
+    top.position.set(p.x, .80, p.z);
+    top.userData.partId = 'suspension';
+    mant3D._meshes.push(top); scene.add(top);
+  });
+}
+
+// Loading UI
+function _showMantLoading(on, pct){
+  const cont = document.getElementById('mantViewer');
+  if(!cont) return;
+  let el = document.getElementById('mantLoad');
+  if(on){
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'mantLoad';
+      el.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tx);font-family:var(--mo);font-size:13px;background:rgba(15,17,23,.65);z-index:8;letter-spacing:.5px';
+      cont.appendChild(el);
+    }
+    el.textContent = pct?`Cargando modelo 3D... ${pct}%`:'Cargando modelo 3D...';
+  } else if(el){
+    el.remove();
+  }
+}
+
+// Ajusta el modelo cargado a las dimensiones esperadas
+function _fitModel(model){
+  let bb = new THREE.Box3().setFromObject(model);
+  let size = bb.getSize(new THREE.Vector3());
+  // Si el eje largo es Z, rotar para alinear con X (forward = +X)
+  if(size.z > size.x * 1.3){
+    model.rotation.y = -Math.PI/2;
+    model.updateMatrixWorld(true);
+    bb = new THREE.Box3().setFromObject(model);
+    size = bb.getSize(new THREE.Vector3());
+  }
+  // Escalar para que la longitud sea ~4.4 unidades
+  const scale = 4.4 / size.x;
+  model.scale.setScalar(scale);
+  model.updateMatrixWorld(true);
+  bb = new THREE.Box3().setFromObject(model);
+  const center = bb.getCenter(new THREE.Vector3());
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= bb.min.y;
+}
+
+// Construye halos (esferas semitransparentes, NO clickables) para indicar salud
+function _addHalo(scene, pid, center, r){
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 20, 14),
+    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0, depthWrite:false, side:THREE.DoubleSide})
+  );
+  halo.position.copy(center);
+  halo.userData.partId = pid;
+  halo.userData._isHalo = true;
+  halo.renderOrder = 999;
+  scene.add(halo);
+  mant3D._halos.push(halo);
+}
+function _haloFromMeshes(scene, pid, meshes){
+  const bb = new THREE.Box3();
+  meshes.forEach(m=>bb.expandByObject(m));
+  if(bb.isEmpty()) return;
+  const c = bb.getCenter(new THREE.Vector3());
+  const s = bb.getSize(new THREE.Vector3());
+  const r = Math.min(Math.max(s.x,s.y,s.z)*.55, .50);
+  _addHalo(scene, pid, c, r);
+}
+function _buildHalos(scene){
+  mant3D._halos = [];
+  const byPart = {};
+  mant3D._meshes.forEach(m=>{
+    const pid = m.userData.partId; if(!pid) return;
+    (byPart[pid]=byPart[pid]||[]).push(m);
+  });
+  Object.entries(byPart).forEach(([pid, meshes])=>{
+    // Filtrar mallas mergeadas masivas (>2 unidades) — distorsionan bbox
+    const small = meshes.filter(m=>{
+      const s = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+      return Math.max(s.x,s.y,s.z) < 2.0;
+    });
+    const use = small.length ? small : meshes;
+    // Faros: 2 clusters (frente + atrás)
+    if(pid === 'faros' && use.length > 1){
+      const front = use.filter(m=>new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).x > 0);
+      const rear  = use.filter(m=>new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).x < 0);
+      if(front.length) _haloFromMeshes(scene, pid, front);
+      if(rear.length)  _haloFromMeshes(scene, pid, rear);
+    }
+    // Suspensión: 4 clusters por esquina
+    else if(pid === 'suspension' && use.length > 1){
+      const cs = use.map(m=>({m, c:new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3())}));
+      const fr = cs.filter(o=>o.c.x>0 && o.c.z>0).map(o=>o.m);
+      const fl = cs.filter(o=>o.c.x>0 && o.c.z<0).map(o=>o.m);
+      const rr = cs.filter(o=>o.c.x<0 && o.c.z>0).map(o=>o.m);
+      const rl = cs.filter(o=>o.c.x<0 && o.c.z<0).map(o=>o.m);
+      if(fr.length) _haloFromMeshes(scene, pid, fr);
+      if(fl.length) _haloFromMeshes(scene, pid, fl);
+      if(rr.length) _haloFromMeshes(scene, pid, rr);
+      if(rl.length) _haloFromMeshes(scene, pid, rl);
+    }
+    else {
+      _haloFromMeshes(scene, pid, use);
+    }
+  });
+  // Halos fijos para las 4 ruedas (geometría merged en el GLB)
+  [
+    {pid:'llanta_fr', x: 1.30, y:.42, z: .92},
+    {pid:'llanta_fl', x: 1.30, y:.42, z:-.92},
+    {pid:'llanta_rr', x:-1.30, y:.42, z: .92},
+    {pid:'llanta_rl', x:-1.30, y:.42, z:-.92},
+  ].forEach(p=>_addHalo(scene, p.pid, new THREE.Vector3(p.x,p.y,p.z), .35));
+}
+
+function buildCar(){
+  const g = new THREE.Group();
+  // === CARROCERÍA (translúcida) ===
+  _bodyP(g, new THREE.BoxGeometry(4.4,.55,1.85), 0, .55, 0);                   // chasis
+  _bodyP(g, new THREE.BoxGeometry(.20,.30,1.85), 2.30, .42, 0, _bodyMat(0x4a505c,.55));  // defensa frontal
+  _bodyP(g, new THREE.BoxGeometry(.20,.30,1.85), -2.30, .42, 0, _bodyMat(0x4a505c,.55)); // defensa trasera
+  _bodyP(g, new THREE.BoxGeometry(1.5,.05,1.78), 1.30, .86, 0);                // cofre
+  _bodyP(g, new THREE.BoxGeometry(1.95,.55,1.65), -.15, 1.12, 0);              // cabina (shell)
+  _bodyP(g, new THREE.BoxGeometry(1.45,.04,1.55), -.15, 1.42, 0);              // techo
+  _bodyP(g, new THREE.BoxGeometry(1.0,.05,1.78), -1.65, .86, 0);               // tapa cajuela
+  _bodyP(g, new THREE.BoxGeometry(.10,.10,.18), .85, 1.20, .85, _bodyMat(0x4a505c,.55));  // espejo izq
+  _bodyP(g, new THREE.BoxGeometry(.10,.10,.18), .85, 1.20, -.85, _bodyMat(0x4a505c,.55)); // espejo der
+  // cristales laterales
+  _bodyP(g, new THREE.BoxGeometry(1.0,.32,.04), -.15, 1.22, .82, _glassMat());
+  _bodyP(g, new THREE.BoxGeometry(1.0,.32,.04), -.15, 1.22, -.82, _glassMat());
+  // parrilla (fondo + barras horizontales)
+  _bodyP(g, new THREE.BoxGeometry(.04,.20,1.10), 2.18, .50, 0, new THREE.MeshStandardMaterial({color:0x1f2330, metalness:.3, roughness:.6}));
+  for(let i=-2; i<=2; i++){
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(.05,.025,1.05), new THREE.MeshStandardMaterial({color:0x6a727f, metalness:.7, roughness:.35}));
+    bar.position.set(2.20, .42 + i*.04, 0);
+    g.add(bar);
+  }
+  // === PARABRISAS / LIMPIA. (clickable) ===
+  _partP(g, new THREE.BoxGeometry(.04,.40,1.55), .85, 1.07, 0, 'parabrisas', 0x2a3548);
+  _partP(g, new THREE.BoxGeometry(.04,.35,1.55), -1.10, 1.10, 0, 'parabrisas', 0x2a3548);
+  _partP(g, new THREE.BoxGeometry(.06,.04,.55), .87, .89, .25, 'parabrisas', 0x111827);
+  // === FAROS (clickable) ===
+  _partP(g, new THREE.SphereGeometry(.13, 16, 16), 2.18, .70, .65, 'faros', 0xc0c8d4);
+  _partP(g, new THREE.SphereGeometry(.13, 16, 16), 2.18, .70, -.65, 'faros', 0xc0c8d4);
+  _partP(g, new THREE.SphereGeometry(.07, 12, 12), 2.18, .70, .35, 'faros', 0x9ea4b0);
+  _partP(g, new THREE.SphereGeometry(.07, 12, 12), 2.18, .70, -.35, 'faros', 0x9ea4b0);
+  _partP(g, new THREE.BoxGeometry(.05,.14,.30), -2.20, .68, .58, 'faros', 0x9ea4b0);
+  _partP(g, new THREE.BoxGeometry(.05,.14,.30), -2.20, .68, -.58, 'faros', 0x9ea4b0);
+  _partP(g, new THREE.BoxGeometry(.05,.10,.10), -2.20, .68, .25, 'faros', 0x9ea4b0);
+  _partP(g, new THREE.BoxGeometry(.05,.10,.10), -2.20, .68, -.25, 'faros', 0x9ea4b0);
+  // === ENGINE BAY (siempre visible — body translúcido) ===
+  _partP(g, new THREE.BoxGeometry(.95,.28,1.0), 1.55, .97, 0, 'motor', 0x4a505c);
+  _partP(g, new THREE.BoxGeometry(.32,.26,.30), .85, .96, .60, 'bateria', 0x808a9a);
+  // alternador (cilindro horizontal)
+  const altern = new THREE.Mesh(new THREE.CylinderGeometry(.10,.10,.20, 16), _partMat(0xa0a8b8));
+  altern.rotation.z = Math.PI/2; altern.position.set(1.55, .95, -.58);
+  altern.userData.partId = 'electrico';
+  mant3D._meshes.push(altern); g.add(altern);
+  _partP(g, new THREE.BoxGeometry(.22,.14,.28), .85, .94, -.55, 'electrico', 0x404858);
+  // === RUEDAS (4) con rin de 5 rayos ===
+  function wheel(x, z, partId){
+    const wg = new THREE.Group();
+    const outZ = (z>0)?1:-1; // dirección hacia afuera
+    // llanta (tyre)
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.30, 32), _partMat(0x2a2f3a));
+    tyre.rotation.x = Math.PI/2;
+    tyre.userData.partId = partId;
+    mant3D._meshes.push(tyre); wg.add(tyre);
+    // disco/backplate
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.04, 24), _partMat(0x6a727f));
+    disc.rotation.x = Math.PI/2;
+    disc.position.z = .16*outZ;
+    disc.userData.partId = partId;
+    mant3D._meshes.push(disc); wg.add(disc);
+    // 5 rayos
+    for(let i=0; i<5; i++){
+      const ang = (i/5) * Math.PI*2;
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(.05,.22,.05), _partMat(0x9aa2b0));
+      spoke.position.set(Math.cos(ang)*.14, Math.sin(ang)*.14, .19*outZ);
+      spoke.rotation.z = ang - Math.PI/2;
+      spoke.userData.partId = partId;
+      mant3D._meshes.push(spoke); wg.add(spoke);
+    }
+    // hub central
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,.08, 12), _partMat(0x3a4050));
+    hub.rotation.x = Math.PI/2;
+    hub.position.z = .21*outZ;
+    hub.userData.partId = partId;
+    mant3D._meshes.push(hub); wg.add(hub);
+    wg.position.set(x, .42, z);
+    return wg;
+  }
+  g.add(wheel( 1.3,  .92, 'llanta_fr'));
+  g.add(wheel( 1.3, -.92, 'llanta_fl'));
+  g.add(wheel(-1.3,  .92, 'llanta_rr'));
+  g.add(wheel(-1.3, -.92, 'llanta_rl'));
+  return g;
+}
+
+function init3D(autoId){
+  disposeMant3D();
+  const cont = document.getElementById('mantViewer');
+  if(!cont || !window.THREE) return;
+  mant3D._autoId = autoId;
+  const w = cont.clientWidth || 600, h = cont.clientHeight || 520;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, w/h, 0.1, 100);
+  camera.position.set(6, 4.2, 7);
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  cont.insertBefore(renderer.domElement, cont.firstChild);
+  scene.add(new THREE.AmbientLight(0xffffff, .95));
+  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x1a1d28, .55));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.4); dir.position.set(5,8,5); scene.add(dir);
+  const dir2 = new THREE.DirectionalLight(0xc8d8ff, .45); dir2.position.set(-5,3,-5); scene.add(dir2);
+  const dir3 = new THREE.DirectionalLight(0xffe9c4, .35); dir3.position.set(0,4,-6); scene.add(dir3);
+  const grid = new THREE.GridHelper(12, 12, 0x4ade80, 0x252a3a); grid.position.y=0; scene.add(grid);
+  // === Cargar modelo GLB ===
+  _showMantLoading(true);
+  const loader = new THREE.GLTFLoader();
+  loader.load('models/sonic.glb', gltf=>{
+    if(!mant3D || !mant3D.scene){return;}// dispose ocurrió antes de cargar
+    const model = gltf.scene;
+    _fitModel(model);
+    scene.add(model);
+    _tagModelParts(model);
+    _alignModelOrientation(model);
+    // Engine bay procedural DENTRO del cofre (visible solo en rayos X)
+    const eb = new THREE.Group();
+    _buildEngineBay(eb, {x:1.35, y:.70, z:-.05});
+    scene.add(eb);
+    _buildSuspension(scene);
+    _buildHalos(scene);
+    applyHealthColors();
+    _showMantLoading(false);
+  }, xhr=>{
+    if(xhr.lengthComputable) _showMantLoading(true, Math.round(xhr.loaded/xhr.total*100));
+  }, err=>{
+    console.error('GLB load failed:', err);
+    _showMantLoading(false);
+    scene.add(buildCar());
+    applyHealthColors();
+  });
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = .08;
+  controls.minDistance = 3; controls.maxDistance = 18;
+  controls.maxPolarAngle = Math.PI*0.49;
+  controls.target.set(0, .8, 0);
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let _md=null;
+  renderer.domElement.addEventListener('pointerdown', e=>{_md={x:e.clientX,y:e.clientY};});
+  function _clickTargets(){ return mant3D._meshes.concat(mant3D._bodyMeshes); }
+  renderer.domElement.addEventListener('pointerup', e=>{
+    if(!_md) return;
+    const dx=Math.abs(e.clientX-_md.x), dy=Math.abs(e.clientY-_md.y);
+    _md=null;
+    if(dx>5||dy>5) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+    mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(_clickTargets(), false);
+    if(hits.length){
+      const pid = _detectPid(hits[0]);
+      if(pid) selectPart(pid);
+    }
+  });
+  const tip = document.getElementById('mantTip');
+  renderer.domElement.addEventListener('pointermove', e=>{
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+    mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(_clickTargets(), false);
+    let pid = null;
+    if(hits.length) pid = _detectPid(hits[0]);
+    if(pid){
+      tip.textContent = (PARTES[pid]?.icon||'')+' '+(PARTES[pid]?.nombre||pid);
+      tip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tip.style.top = (e.clientY - rect.top + 12) + 'px';
+      tip.style.display = 'block';
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      tip.style.display = 'none';
+      renderer.domElement.style.cursor = '';
+    }
+  });
+  renderer.domElement.addEventListener('pointerleave', ()=>{tip.style.display='none';});
+  function onResize(){
+    if(!cont || !cont.clientWidth) return;
+    camera.aspect = cont.clientWidth/cont.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(cont.clientWidth, cont.clientHeight);
+  }
+  window.addEventListener('resize', onResize);
+  function animate(){
+    if(!mant3D || !mant3D.renderer) return;
+    mant3D._animFrame = requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  mant3D.scene=scene; mant3D.camera=camera; mant3D.renderer=renderer; mant3D.controls=controls; mant3D.raycaster=raycaster;
+  animate();
+}
+
+function setXray(on){
+  if(!mant3D) return;
+  mant3D._xray = on;
+  mant3D._bodyMeshes.forEach(m=>{
+    if(!m.material) return;
+    const mats = Array.isArray(m.material)?m.material:[m.material];
+    mats.forEach(mat=>{
+      if(on){
+        if(mat._origOpacity===undefined){
+          mat._origOpacity = mat.opacity;
+          mat._origTransparent = mat.transparent;
+          mat._origDepthWrite = mat.depthWrite;
+        }
+        mat.transparent = true;
+        mat.opacity = .15;
+        mat.depthWrite = false;
+        mat.needsUpdate = true;
+      } else {
+        if(mat._origOpacity!==undefined){
+          mat.opacity = mat._origOpacity;
+          mat.transparent = mat._origTransparent;
+          mat.depthWrite = mat._origDepthWrite;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  });
+  const btn = document.getElementById('btnMantHood');
+  if(btn){ btn.textContent = on?'👁 Vista normal':'👁 Rayos X'; btn.classList.toggle('on', on); }
+}
+
+function selectPart(partId){
+  mant3D._selectedPart = partId;
+  // Auto-rayos X para partes internas
+  const internal = ['motor','bateria','electrico','transmision','suspension'];
+  if(internal.includes(partId) && !mant3D._xray) setXray(true);
+  else if(!internal.includes(partId) && mant3D._xray) setXray(false);
+  applyHealthColors();
+  renderMantPanel();
+}
+
+function renderMantPanel(){
+  const panel = document.getElementById('mantPanel');
+  if(!panel) return;
+  const aId = mant3D._autoId;
+  const auto = AUTOS.find(x=>x.id===aId);
+  if(!auto){ panel.innerHTML='<div class="emp">Selecciona un auto.</div>'; return; }
+  const pills = Object.entries(PARTES).map(([k,p])=>{
+    const st = partHealthState(aId, k);
+    const dotColor = st==='green'?'#4ade80':st==='yellow'?'#fbbf24':st==='red'?'#ef4444':'#555a6e';
+    const dot = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotColor};margin-right:4px;vertical-align:middle"></span>`;
+    return `<div class="mant-cat${mant3D._selectedPart===k?' on':''}" data-part="${k}">${dot}${p.icon} ${p.nombre}</div>`;
+  }).join('');
+  let body;
+  if(!mant3D._selectedPart){
+    body = `<div class="emp" style="padding:30px 10px"><div style="font-size:30px;margin-bottom:8px">🛠️</div><p style="font-size:13px">Click en una parte del auto<br>o elige una categoría arriba.</p></div>`;
+  } else {
+    const p = PARTES[mant3D._selectedPart];
+    body = `<div class="mant-part-head">
+      <div class="ph-ico">${p.icon}</div>
+      <div><div class="ph-nom">${p.nombre}</div><div class="ph-sub">${p.servicios.length} servicio${p.servicios.length===1?'':'s'} rastreable${p.servicios.length===1?'':'s'}</div></div>
+    </div>`;
+    body += p.servicios.map(s=>{
+      const last = lastMant(aId, mant3D._selectedPart, s);
+      const hist = getMantList(aId, mant3D._selectedPart, s).slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+      let lastTxt = 'Sin registros'; let lastCls = '';
+      if(last){
+        const days = Math.floor((Date.now()-new Date(last.fecha).getTime())/86400000);
+        lastTxt = `Última: ${fdate(last.fecha)}`;
+        if(last.km) lastTxt += ` · ${Number(last.km).toLocaleString('es-MX')} km`;
+        lastCls = days<90?'fresh':days<180?'warn':'old';
+      }
+      const histHtml = hist.length?hist.map(e=>{
+        const t = e.tallerId ? TALLERES.find(t=>t.id===e.tallerId) : null;
+        const tName = t ? (t.nombreCompleto||t.nombre||((t.nombre1||'')+' '+(t.nombre2||''))) : '';
+        const linkBadge = e._linked?'<span class="b bb" style="font-size:9px;padding:1px 6px;margin-left:4px">📋 Bitácora</span>':e._linkLost?'<span class="b br" style="font-size:9px;padding:1px 6px;margin-left:4px">⚠ Mov. eliminado</span>':'';
+        return `<div class="mant-hist-row">
+          <div>${fdate(e.fecha)}${e.km?` · ${Number(e.km).toLocaleString('es-MX')} km`:''}${e.costo?` · ${fmt(-Math.abs(e.costo))}`:''}${linkBadge}
+            ${(e.nota||tName)?`<div class="mant-hist-meta">${tName?'🏪 '+tName+(e.nota?' · ':''):''}${e.nota||''}</div>`:''}
+          </div>
+          <button class="btn bg sm btn-edit-mant" data-id="${e.id}" data-srv="${s}" style="padding:2px 8px;font-size:10px">Editar</button>
+        </div>`;
+      }).join(''):'<div class="mant-empty-svc">Sin historial.</div>';
+      return `<div class="mant-svc" data-srv="${s}">
+        <div class="mant-svc-head">
+          <div>
+            <div class="mant-svc-name">${s}</div>
+            <div class="mant-svc-last ${lastCls}">${lastTxt}</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button class="btn bg sm btn-toggle-svc" style="padding:3px 9px;font-size:11px">${hist.length} ${hist.length===1?'reg.':'regs.'}</button>
+            <button class="btn bp sm btn-add-mant" data-srv="${s}" style="padding:3px 9px;font-size:11px">＋</button>
+          </div>
+        </div>
+        <div class="mant-svc-hist">${histHtml}</div>
+      </div>`;
+    }).join('');
+  }
+  panel.innerHTML = `
+    <div class="ct" style="margin-bottom:8px">${auto.nombre} <span style="color:var(--tx3)">· ${auto.placas||''}</span></div>
+    <div class="mant-cats">${pills}</div>
+    ${body}
+  `;
+  panel.querySelectorAll('.mant-cat').forEach(el=>{
+    el.addEventListener('click',()=>selectPart(el.dataset.part));
+  });
+  panel.querySelectorAll('.btn-toggle-svc').forEach(el=>{
+    el.addEventListener('click',e=>{ e.stopPropagation(); el.closest('.mant-svc').classList.toggle('exp'); });
+  });
+  panel.querySelectorAll('.btn-add-mant').forEach(el=>{
+    el.addEventListener('click',e=>{ e.stopPropagation(); abrirModalMant(mant3D._selectedPart, el.dataset.srv); });
+  });
+  panel.querySelectorAll('.btn-edit-mant').forEach(el=>{
+    el.addEventListener('click',e=>{
+      e.stopPropagation();
+      const eid = el.dataset.id;
+      const arr = getMantList(aId, mant3D._selectedPart);
+      const ent = arr.find(x=>x.id===eid);
+      if(ent) abrirModalMant(mant3D._selectedPart, el.dataset.srv, ent);
+    });
+  });
+}
+
+function abrirModalMant(parteId, servicio, ent=null){
+  const aId = mant3D._autoId;
+  document.getElementById('modalMantTit').textContent = ent?'Editar registro':'Registrar servicio';
+  document.getElementById('modalMantSub').textContent = (PARTES[parteId]?.nombre||'')+' › '+servicio;
+  document.getElementById('mtPart').value = parteId;
+  document.getElementById('mtServ').value = servicio;
+  document.getElementById('mtId').value = ent?ent.id:'';
+  document.getElementById('mtFecha').value = ent?ent.fecha:new Date().toISOString().slice(0,10);
+  document.getElementById('mtKm').value = ent && ent.km!=null?ent.km:'';
+  document.getElementById('mtCosto').value = ent && ent.costo!=null?Math.abs(ent.costo):'';
+  document.getElementById('mtNota').value = ent?(ent.nota||''):'';
+  const selT = document.getElementById('mtTaller');
+  selT.innerHTML = '<option value="">— Sin taller —</option>'+TALLERES.map(t=>`<option value="${t.id}">${t.nombreCompleto||t.nombre||t.nombre1+' '+(t.nombre2||'')}</option>`).join('');
+  selT.value = ent?(ent.tallerId||''):'';
+  // movimientos del auto (egresos sin vincular ya a otro entry, salvo el actual)
+  const linkedIds = new Set();
+  Object.values(MANTENIMIENTO[aId]||{}).forEach(arr=>arr.forEach(x=>{if(x.movId && (!ent||x.id!==ent.id)) linkedIds.add(x.movId);}));
+  const movs = MOVS.filter(m=>m.autoId===aId && Number(m.monto)<0 && !linkedIds.has(m.id))
+                   .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const selM = document.getElementById('mtMov');
+  selM.innerHTML = '<option value="">— Crear registro independiente —</option>'+
+    movs.map(m=>`<option value="${m.id}">${fdate(m.fecha)} · ${m.categoria||''} · ${(m.concepto||'').slice(0,40)} · ${fmt(m.monto)}</option>`).join('');
+  selM.value = ent?(ent.movId||''):'';
+  document.getElementById('mtMovInfo').style.display = (ent&&ent.movId)?'block':'none';
+  // Si entry vinculada, deshabilitar campos sincronizados
+  const linked = ent && ent.movId;
+  ['mtFecha','mtCosto','mtTaller','mtNota'].forEach(id=>{document.getElementById(id).disabled=linked;});
+  document.getElementById('btnDelMant').style.display = ent?'inline-flex':'none';
+  document.getElementById('modalMant').classList.add('on');
+}
+function cerrarModalMant(){ document.getElementById('modalMant').classList.remove('on'); }
+
+function guardarMant(){
+  const aId = mant3D._autoId;
+  const pId = document.getElementById('mtPart').value;
+  const srv = document.getElementById('mtServ').value;
+  const id  = document.getElementById('mtId').value;
+  const fecha = document.getElementById('mtFecha').value;
+  if(!fecha){ toast('Falta la fecha','er'); return; }
+  const movId = document.getElementById('mtMov').value||null;
+  const ent = {
+    id: id||('m'+Date.now()+Math.random().toString(36).slice(2,7)),
+    servicio: srv, fecha,
+    km: document.getElementById('mtKm').value!==''?Number(document.getElementById('mtKm').value):null,
+    costo: document.getElementById('mtCosto').value!==''?Number(document.getElementById('mtCosto').value):null,
+    tallerId: document.getElementById('mtTaller').value||null,
+    nota: document.getElementById('mtNota').value||'',
+    movId
+  };
+  if(!MANTENIMIENTO[aId]) MANTENIMIENTO[aId]={};
+  if(!MANTENIMIENTO[aId][pId]) MANTENIMIENTO[aId][pId]=[];
+  if(id){
+    const arr = MANTENIMIENTO[aId][pId];
+    const i = arr.findIndex(e=>e.id===id);
+    if(i>=0) arr[i]=ent; else arr.push(ent);
+  } else MANTENIMIENTO[aId][pId].push(ent);
+  save();
+  cerrarModalMant();
+  renderMantPanel();
+  applyHealthColors();
+  toast('✓ Servicio registrado');
+}
+
+async function eliminarMant(){
+  const aId = mant3D._autoId;
+  const pId = document.getElementById('mtPart').value;
+  const id  = document.getElementById('mtId').value;
+  if(!id) return;
+  if(!await confirmar('¿Eliminar este registro?')) return;
+  if(MANTENIMIENTO[aId]?.[pId]){
+    MANTENIMIENTO[aId][pId] = MANTENIMIENTO[aId][pId].filter(e=>e.id!==id);
+  }
+  save();
+  cerrarModalMant();
+  renderMantPanel();
+  applyHealthColors();
+  toast('Registro eliminado');
+}
+
+function renderMant(){
+  const sel = document.getElementById('mantAuto');
+  if(!sel) return;
+  if(!AUTOS.length){
+    sel.innerHTML='<option>Sin autos</option>';
+    document.getElementById('mantPanel').innerHTML='<div class="emp"><div style="font-size:30px">🚗</div><p>Agrega un auto primero.</p></div>';
+    return;
+  }
+  const cur = sel.value || mant3D._autoId || AUTOS[0].id;
+  sel.innerHTML = AUTOS.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.nombre}</option>`).join('');
+  setTimeout(()=>{ init3D(cur); mant3D._selectedPart=null; renderMantPanel(); }, 30);
+}
+
+document.getElementById('mantAuto').addEventListener('change', e=>{
+  init3D(e.target.value);
+  mant3D._selectedPart = null;
+  renderMantPanel();
+});
+document.getElementById('btnMantHood').addEventListener('click',()=>setXray(!mant3D._xray));
+document.getElementById('btnMantReset').addEventListener('click',()=>{
+  if(mant3D && mant3D.controls){
+    mant3D.camera.position.set(6, 4.2, 7);
+    mant3D.controls.target.set(0, .8, 0);
+    mant3D.controls.update();
+  }
+});
+document.getElementById('btnOkMant').addEventListener('click', guardarMant);
+document.getElementById('btnCancelMant').addEventListener('click', cerrarModalMant);
+document.getElementById('btnDelMant').addEventListener('click', eliminarMant);
+document.getElementById('mtMov').addEventListener('change', e=>{
+  const id = e.target.value;
+  const linked = !!id;
+  document.getElementById('mtMovInfo').style.display = linked?'block':'none';
+  ['mtFecha','mtCosto','mtTaller','mtNota'].forEach(f=>{document.getElementById(f).disabled=linked;});
+  if(!id) return;
+  const m = MOVS.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('mtFecha').value = m.fecha||document.getElementById('mtFecha').value;
+  document.getElementById('mtCosto').value = Math.abs(Number(m.monto)||0)||'';
+  document.getElementById('mtNota').value = (m.concepto||'')+(m.nota?' — '+m.nota:'');
+  if(m.proveedorId){
+    const sel = document.getElementById('mtTaller');
+    if([...sel.options].some(o=>o.value===m.proveedorId)) sel.value = m.proveedorId;
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
