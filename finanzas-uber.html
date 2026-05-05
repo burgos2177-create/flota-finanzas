@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -688,6 +690,29 @@ tr.d3{background:rgba(248,113,113,.04)}
   </div>
 
   <div class="card">
+    <div class="ct">📊 Integración con Finanzas Personales (fnz-psnal)</div>
+    <p style="color:var(--tx2);font-size:13px;margin-bottom:14px">
+      Comparte el saldo total de la flota a tu bitácora de finanzas personales. Cada vez que cambia el saldo, se escribe el documento <code style="font-family:var(--mo);font-size:11px;color:var(--gr)">usuarios/{tu_uid}/global/empresas</code> en el proyecto Firestore <strong style="color:var(--tx)">fnz-psnal</strong>.
+    </p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span id="psnDot" style="font-size:22px">⚫</span>
+      <div style="flex:1">
+        <div id="psnStatusText" style="color:var(--tx);font-size:14px;font-weight:500">Sin sesión</div>
+        <div id="psnLastSync" style="font-size:11px;color:var(--tx3);margin-top:2px"></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:var(--tx3);font-family:var(--mo);text-transform:uppercase;letter-spacing:.6px">Saldo a compartir</div>
+        <div id="psnSaldoPreview" style="font-family:var(--mo);font-size:16px;font-weight:600;color:var(--gr)">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bp" id="btnPsnLogin">🔐 &nbsp;Iniciar sesión con Google</button>
+      <button class="btn bp" id="btnPsnSync" disabled>↗ &nbsp;Sincronizar ahora</button>
+      <button class="btn bd" id="btnPsnLogout" style="display:none">✕ &nbsp;Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="ct">¿Cómo funciona?</div>
     <ul style="color:var(--tx2);font-size:13px;line-height:2.1;padding-left:18px">
       <li>Cada vez que guardas un dato se sincroniza automáticamente a Firebase.</li>
@@ -1031,8 +1056,9 @@ async function initFirebase(){
   if(!cfg?.apiKey||!cfg?.databaseURL){setCloudDot('off');return;}
   try{
     if(typeof firebase==='undefined'){setCloudDot('error');return;}
-    if(!firebase.apps.length)firebase.initializeApp(cfg);
-    _fbDB=firebase.database();
+    let defaultApp;
+    try{ defaultApp = firebase.app(); }catch(_){ defaultApp = firebase.initializeApp(cfg); }
+    _fbDB = defaultApp.database();
     setCloudDot('syncing');
     await loadFromCloud();
     setupCloudListener();
@@ -4111,6 +4137,146 @@ document.getElementById('mtMov').addEventListener('change', e=>{
     if([...sel.options].some(o=>o.value===m.proveedorId)) sel.value = m.proveedorId;
   }
 });
+
+// ═══════════════════════════════════════════════════════════
+// INTEGRACIÓN FINANZAS PERSONALES (fnz-psnal)
+// ═══════════════════════════════════════════════════════════
+const PSN_CONFIG = {
+  apiKey: "AIzaSyD4AguJyQYpv49hrO84RtK3kv5kf93FtjE",
+  authDomain: "fnz-psnal.firebaseapp.com",
+  databaseURL: "https://fnz-psnal-default-rtdb.firebaseio.com",
+  projectId: "fnz-psnal",
+  storageBucket: "fnz-psnal.firebasestorage.app",
+  messagingSenderId: "570838574175",
+  appId: "1:570838574175:web:f9194df1b31f21e3c6e7ea"
+};
+const PSN_EMPRESA = { id: 'ubers', nombre: 'Ubers', moneda: 'MXN' };
+let _psnApp = null, _psnAuth = null, _psnDb = null, _psnUser = null, _psnSyncTimer = null, _psnSyncing = false;
+
+function _psnSetDot(state, text){
+  const map = {off:'⚫', ok:'🟢', sync:'🔵', err:'🔴'};
+  const dot = document.getElementById('psnDot');
+  const txt = document.getElementById('psnStatusText');
+  if(dot) dot.textContent = map[state]||'⚫';
+  if(txt && text) txt.textContent = text;
+}
+
+function _psnUpdateUI(){
+  const total = _psnTotalSaldo();
+  const prev = document.getElementById('psnSaldoPreview');
+  if(prev) prev.textContent = fmt(total);
+  const btnLogin = document.getElementById('btnPsnLogin');
+  const btnSync = document.getElementById('btnPsnSync');
+  const btnLogout = document.getElementById('btnPsnLogout');
+  if(_psnUser){
+    if(btnLogin) btnLogin.style.display = 'none';
+    if(btnSync) btnSync.disabled = false;
+    if(btnLogout) btnLogout.style.display = 'inline-flex';
+    _psnSetDot('ok', `Conectado como ${_psnUser.email||_psnUser.displayName||_psnUser.uid}`);
+  } else {
+    if(btnLogin) btnLogin.style.display = 'inline-flex';
+    if(btnSync) btnSync.disabled = true;
+    if(btnLogout) btnLogout.style.display = 'none';
+    _psnSetDot('off', 'Sin sesión');
+  }
+}
+
+function _psnTotalSaldo(){
+  return AUTOS.reduce((s,a)=>s+getSaldo(a.id),0)+getSaldo('__general__');
+}
+
+async function _psnInitFirebase(){
+  if(_psnApp) return _psnApp;
+  if(typeof firebase==='undefined') return null;
+  try{
+    _psnApp = firebase.initializeApp(PSN_CONFIG, 'personal');
+    _psnAuth = _psnApp.auth();
+    _psnDb = _psnApp.firestore();
+    _psnAuth.onAuthStateChanged(user=>{
+      _psnUser = user;
+      _psnUpdateUI();
+      if(user) _psnSyncSaldo(); // sync inicial al detectar sesión persistida
+    });
+  }catch(e){ console.error('psn init:', e); }
+  return _psnApp;
+}
+
+async function _psnLogin(){
+  await _psnInitFirebase();
+  if(!_psnAuth){ toast('Firebase no disponible','er'); return; }
+  try{
+    _psnSetDot('sync','Iniciando sesión...');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _psnAuth.signInWithPopup(provider);
+    toast('✓ Sesión iniciada');
+  }catch(e){
+    console.error('psn login:', e);
+    _psnSetDot('err', 'Error al iniciar sesión: '+(e.message||e.code||''));
+    toast('Error al iniciar sesión','er');
+  }
+}
+
+async function _psnLogout(){
+  if(!_psnAuth) return;
+  try{ await _psnAuth.signOut(); toast('Sesión cerrada'); }catch(e){console.error('psn logout:',e);}
+}
+
+async function _psnSyncSaldo(force=false){
+  if(!_psnUser || !_psnDb || _psnSyncing) return;
+  clearTimeout(_psnSyncTimer);
+  _psnSyncTimer = setTimeout(async()=>{
+    _psnSyncing = true;
+    _psnSetDot('sync', 'Sincronizando...');
+    try{
+      const ref = _psnDb.collection('usuarios').doc(_psnUser.uid).collection('global').doc('empresas');
+      const snap = await ref.get();
+      const data = snap.exists ? (snap.data()||{}) : {};
+      const list = Array.isArray(data.list) ? [...data.list] : [];
+      const entry = {
+        id: PSN_EMPRESA.id,
+        nombre: PSN_EMPRESA.nombre,
+        saldo: Number(_psnTotalSaldo().toFixed(2)),
+        moneda: PSN_EMPRESA.moneda,
+        source: 'external',
+        lastUpdate: new Date().toISOString()
+      };
+      const i = list.findIndex(e=>e && e.id===PSN_EMPRESA.id);
+      if(i>=0) list[i] = entry; else list.push(entry);
+      await ref.set({...data, list}, {merge:true});
+      const t = new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+      const el = document.getElementById('psnLastSync');
+      if(el) el.textContent = `Última sync: ${t} · ${fmt(entry.saldo)}`;
+      S.set('ff_psn_last', t);
+      _psnSetDot('ok', `Conectado como ${_psnUser.email||_psnUser.uid}`);
+    }catch(e){
+      console.error('psn sync:', e);
+      _psnSetDot('err', 'Error: '+(e.message||e.code||''));
+      toast('Error al sincronizar a finanzas personales','er');
+    }
+    _psnSyncing = false;
+  }, force?0:1000);
+}
+
+// Hook a save() existente: enganchamos sin tocar la función original
+const _origSave = save;
+save = function(){
+  _origSave();
+  if(_psnUser) _psnSyncSaldo();
+  _psnUpdateUI();
+};
+
+document.getElementById('btnPsnLogin').addEventListener('click', _psnLogin);
+document.getElementById('btnPsnLogout').addEventListener('click', _psnLogout);
+document.getElementById('btnPsnSync').addEventListener('click', ()=>_psnSyncSaldo(true));
+
+// Inicializar al cargar (mantiene sesión persistida)
+_psnInitFirebase();
+_psnUpdateUI();
+const _psnLast = S.get('ff_psn_last', null);
+if(_psnLast){
+  const el = document.getElementById('psnLastSync');
+  if(el) el.textContent = `Última sync: ${_psnLast}`;
+}
 
 // ═══════════════════════════════════════════════════════════
 // INIT
