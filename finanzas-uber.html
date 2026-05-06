@@ -1720,21 +1720,33 @@ function abrirCambioChofer(autoId){
   document.getElementById('ccAutoId').value=autoId;
   document.getElementById('ccFecha').value=today();
   document.getElementById('ccNota').value='';
-  document.getElementById('ccChofer').innerHTML='<option value="">Selecciona...</option>'+
-    CHOFERES.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  const act = getPeriodoActivo(autoId);
+  const options = ['<option value="">Selecciona...</option>'];
+  if(act) options.push('<option value="__NONE__">— Sin chofer (cerrar período actual) —</option>');
+  CHOFERES.forEach(c=>options.push(`<option value="${c.id}">${c.nombre}</option>`));
+  document.getElementById('ccChofer').innerHTML=options.join('');
+  document.getElementById('btnOkCambio').textContent='Asignar chofer';
   document.getElementById('modalCambio').classList.add('on');
 }
 document.getElementById('btnCancelCambio').addEventListener('click',()=>document.getElementById('modalCambio').classList.remove('on'));
 document.getElementById('modalCambio').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.classList.remove('on')});
+document.getElementById('ccChofer').addEventListener('change',e=>{
+  document.getElementById('btnOkCambio').textContent = e.target.value==='__NONE__' ? 'Cerrar período' : 'Asignar chofer';
+});
 document.getElementById('btnOkCambio').addEventListener('click',()=>{
   const autoId=document.getElementById('ccAutoId').value;
   const choferId=document.getElementById('ccChofer').value;
   const fecha=document.getElementById('ccFecha').value;
   const nota=document.getElementById('ccNota').value.trim();
-  if(!choferId)return toast('Selecciona un chofer','er');
+  if(!choferId)return toast('Selecciona una opción','er');
   if(!fecha)return toast('Indica la fecha','er');
   const act=getPeriodoActivo(autoId);
-  if(act){const i=PERIODOS.findIndex(p=>p.id===act.id);PERIODOS[i].fin=fecha;}
+  if(act){const i=PERIODOS.findIndex(p=>p.id===act.id);PERIODOS[i].fin=fecha;if(nota)PERIODOS[i].notaFin=nota;}
+  if(choferId==='__NONE__'){
+    save();document.getElementById('modalCambio').classList.remove('on');renderAutos();
+    toast('✓ Período cerrado — auto sin chofer');
+    return;
+  }
   PERIODOS.push({id:uid(),autoId,choferId,ini:fecha,fin:null,nota});
   save();document.getElementById('modalCambio').classList.remove('on');renderAutos();
   toast(`✓ ${getChofer(choferId).nombre} asignado`);
