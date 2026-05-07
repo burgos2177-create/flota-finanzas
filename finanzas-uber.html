@@ -3277,7 +3277,7 @@ const PARTES = {
   transmision: {nombre:'Transmisión',           icon:'🔧', servicios:['Aceite caja','Embrague']},
   suspension:  {nombre:'Suspensión',            icon:'🔩', servicios:['Amortiguadores delanteros','Amortiguadores traseros','Rótulas','Bujes']},
   electrico:   {nombre:'Sistema eléctrico',     icon:'⚡', servicios:['Alternador','Computadora (ECU)','Marcha / Motor de arranque','Bobinas de encendido','Sensor MAF','Sensor O2','Sensor cigüeñal/levas','Fusibles','Cableado / arnés','Cilindro de encendido','Relés']},
-  general:     {nombre:'General',               icon:'🛠️', servicios:['Alineación','Balanceo','Verificación','Afinación','Líquido de frenos']},
+  general:     {nombre:'General',               icon:'🛠️', servicios:['Alineación','Balanceo','Verificación','Afinación','Líquido de frenos','Bomba de frenos']},
 };
 
 // TTL — intervalos recomendados por servicio (km y/o días)
@@ -3336,6 +3336,7 @@ const TTL = {
   'Verificación':               {km:0,     days:180},
   'Afinación':                  {km:30000, days:730},
   'Líquido de frenos':          {km:50000, days:730},
+  'Bomba de frenos':            {km:100000,days:1825},
 };
 function srvUsedPct(autoId, parteId, srv){
   const last = lastMant(autoId, parteId, srv);
