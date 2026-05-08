@@ -318,6 +318,7 @@ tr.d3{background:rgba(248,113,113,.04)}
           <option value="Motor">Motor</option>
           <option value="Frenos">Frenos</option>
           <option value="Clutch">Clutch</option>
+          <option value="Transmisión">Transmisión</option>
           <option value="Eléctrico">Eléctrico</option>
           <option value="Suspensión">Suspensión</option>
           <option value="Carrocería">Carrocería</option>
@@ -2734,7 +2735,7 @@ function calcInac(){
 // ═══════════════════════════════════════════════════════════
 const getTaller=id=>TALLERES.find(t=>t.id===id);
 
-const TIPO_ABREV={'Aceite/Servicio':'AS','Motor':'M','Frenos':'F','Clutch':'C','Eléctrico':'E','Suspensión':'S','Carrocería':'CA','Llantas':'L','Otro':'O'};
+const TIPO_ABREV={'Aceite/Servicio':'AS','Motor':'M','Frenos':'F','Clutch':'C','Transmisión':'T','Eléctrico':'E','Suspensión':'S','Carrocería':'CA','Llantas':'L','Otro':'O'};
 
 function autoPrefix(autoId){
   const a=getAuto(autoId);if(!a)return'??';
@@ -2925,7 +2926,7 @@ function renderRepBD(){
     const editRow=document.createElement('tr');
     editRow.className='rep-edit-row';
     editRow.style.display='none';
-    const tipoOpts=['Aceite/Servicio','Motor','Frenos','Clutch','Eléctrico','Suspensión','Carrocería','Llantas','Otro']
+    const tipoOpts=['Aceite/Servicio','Motor','Frenos','Clutch','Transmisión','Eléctrico','Suspensión','Carrocería','Llantas','Otro']
       .map(t=>`<option value="${t}"${m.tipoRep===t?' selected':''}>${t==='Aceite/Servicio'?'Aceite / Servicio':t}</option>`).join('');
     editRow.innerHTML=`<td colspan="8"><div class="rep-edit-inner">
       <div class="fo" style="min-width:150px"><label>Tipo de reparación</label>
@@ -4390,6 +4391,7 @@ function guardarEditMov(){
             <option value="Motor">Motor</option>
             <option value="Frenos">Frenos</option>
             <option value="Clutch">Clutch</option>
+            <option value="Transmisión">Transmisión</option>
             <option value="Eléctrico">Eléctrico</option>
             <option value="Suspensión">Suspensión</option>
             <option value="Carrocería">Carrocería</option>
