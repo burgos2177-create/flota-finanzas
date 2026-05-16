@@ -513,6 +513,9 @@ tr.d3{background:rgba(248,113,113,.04)}
       <button id="semNext">▸</button>
     </div>
     <select id="semAuto" style="min-width:160px"><option value="">Todos los autos</option></select>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);font-family:var(--mo);cursor:pointer;user-select:none;margin-left:auto">
+      <input type="checkbox" id="semShowInac" style="margin:0;width:auto"> Mostrar inactivos
+    </label>
   </div>
   <div class="card" style="padding:0">
     <div class="tw"><table class="stbl"><thead><tr>
@@ -529,10 +532,15 @@ tr.d3{background:rgba(248,113,113,.04)}
 <div id="pg-mensual" class="pg">
   <div class="pt">Resumen mensual</div>
   <div class="ps">Consolidado mensual por auto y flota.</div>
-  <div class="wnav">
-    <button id="mesPrev">◂</button>
-    <div class="wlabel" id="mesLabel"></div>
-    <button id="mesNext">▸</button>
+  <div class="fb2">
+    <div class="wnav">
+      <button id="mesPrev">◂</button>
+      <div class="wlabel" id="mesLabel"></div>
+      <button id="mesNext">▸</button>
+    </div>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);font-family:var(--mo);cursor:pointer;user-select:none;margin-left:auto">
+      <input type="checkbox" id="mesShowInac" style="margin:0;width:auto"> Mostrar inactivos
+    </label>
   </div>
   <div class="card" style="padding:0">
     <div class="tw"><table class="stbl"><thead><tr>
@@ -2009,7 +2017,10 @@ function renderSemanal(){
     AUTOS.map(a=>`<option value="${a.id}"${a.id===prevVal?' selected':''}>${a.nombre}</option>`).join('')+
     `<option value="__general__"${'__general__'===prevVal?' selected':''}>General (sin auto)</option>`;
   const fAuto=selAuto.value;
-  const autos=fAuto && fAuto!=='__general__'?AUTOS.filter(a=>a.id===fAuto):AUTOS;
+  const showInac = document.getElementById('semShowInac').checked;
+  let autos;
+  if(fAuto && fAuto!=='__general__') autos = AUTOS.filter(a=>a.id===fAuto);
+  else autos = showInac ? AUTOS : AUTOS.filter(a=>a.estado!=='inactivo');
   const showGeneral = !fAuto || fAuto==='__general__';
   const tbody=document.getElementById('tSemanal');
   let tIng=0,tEgr=0,tInac=0,tHrs=0;
@@ -2076,6 +2087,8 @@ function renderSemanal(){
 document.getElementById('semPrev').addEventListener('click',()=>{_semWeekMon.setDate(_semWeekMon.getDate()-7);renderSemanal();});
 document.getElementById('semNext').addEventListener('click',()=>{_semWeekMon.setDate(_semWeekMon.getDate()+7);renderSemanal();});
 document.getElementById('semAuto').addEventListener('change',renderSemanal);
+document.getElementById('semShowInac').checked = S.get('ff_show_inac', false);
+document.getElementById('semShowInac').addEventListener('change', e=>{S.set('ff_show_inac', e.target.checked); document.getElementById('mesShowInac').checked = e.target.checked; renderSemanal();});
 
 // ═══════════════════════════════════════════════════════════
 // RESUMEN MENSUAL
@@ -2087,10 +2100,12 @@ function renderMensual(){
   const mesStr=`${_mesYear}-${String(_mesMes+1).padStart(2,'0')}`;
   const weeks=getWeeksOfMonth(_mesYear,_mesMes);
   const tbody=document.getElementById('tMensual');
+  const showInac = document.getElementById('mesShowInac').checked;
+  const autosVis = showInac ? AUTOS : AUTOS.filter(a=>a.estado!=='inactivo');
   let gIng=0,gEgr=0,gInac=0,gSalEnt=0,gSalSal=0;
   let rows='';
 
-  AUTOS.forEach(a=>{
+  autosVis.forEach(a=>{
     const movsAntes=MOVS.filter(m=>m.autoId===a.id&&m.fecha<`${mesStr}-01`);
     const saldoEnt=movsAntes.reduce((s,m)=>s+Number(m.monto),0);
     const movsMes=MOVS.filter(m=>m.autoId===a.id&&m.fecha.startsWith(mesStr));
@@ -2121,7 +2136,29 @@ function renderMensual(){
     </tr>`;
   });
 
-  if(AUTOS.length>1){
+  // Fila General (movs sin auto específico)
+  const gMovsAntes = MOVS.filter(m=>m.autoId==='__general__' && m.fecha<`${mesStr}-01`);
+  const gMovsMes   = MOVS.filter(m=>m.autoId==='__general__' && m.fecha.startsWith(mesStr));
+  const gSEnt = gMovsAntes.reduce((s,m)=>s+Number(m.monto),0);
+  const gIngG = gMovsMes.filter(m=>Number(m.monto)>0).reduce((s,m)=>s+Number(m.monto),0);
+  const gEgrG = gMovsMes.filter(m=>Number(m.monto)<0).reduce((s,m)=>s+Number(m.monto),0);
+  const gSSal = gSEnt + gIngG + gEgrG;
+  if(gMovsAntes.length || gMovsMes.length){
+    gIng+=gIngG; gEgr+=gEgrG; gSalEnt+=gSEnt; gSalSal+=gSSal;
+    rows+=`<tr>
+      <td style="font-weight:500;color:var(--bl)">📋 General</td>
+      <td style="color:var(--tx3)">—</td>
+      <td class="ab">${fmt(gSEnt)}</td>
+      <td class="ap">${gIngG?fmt(gIngG):'—'}</td>
+      <td class="an">${gEgrG?fmt(gEgrG):'—'}</td>
+      <td class="mo">—</td>
+      <td class="${gSSal>=0?'ap':'an'} ab">${fmt(gSSal)}</td>
+      <td class="mo">—</td>
+    </tr>`;
+  }
+
+  const rowCount = (rows.match(/<tr>/g)||[]).length;
+  if(rows && rowCount>1){
     rows+=`<tr class="totrow">
       <td colspan="2" style="text-align:right">TOTAL FLOTA</td>
       <td class="ab">${fmt(gSalEnt)}</td>
@@ -2133,14 +2170,16 @@ function renderMensual(){
     </tr>`;
   }
 
-  if(!AUTOS.length){
-    rows='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--tx3)">Sin autos registrados.</td></tr>';
+  if(!rows){
+    rows='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--tx3)">Sin movimientos en este mes.</td></tr>';
   }
   tbody.innerHTML=rows;
 }
 
 document.getElementById('mesPrev').addEventListener('click',()=>{_mesMes--;if(_mesMes<0){_mesMes=11;_mesYear--;}renderMensual();});
 document.getElementById('mesNext').addEventListener('click',()=>{_mesMes++;if(_mesMes>11){_mesMes=0;_mesYear++;}renderMensual();});
+document.getElementById('mesShowInac').checked = S.get('ff_show_inac', false);
+document.getElementById('mesShowInac').addEventListener('change', e=>{S.set('ff_show_inac', e.target.checked); document.getElementById('semShowInac').checked = e.target.checked; renderMensual();});
 
 // ═══════════════════════════════════════════════════════════
 // INACTIVIDAD MODAL
