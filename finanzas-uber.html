@@ -2006,14 +2006,16 @@ function renderSemanal(){
   const selAuto=document.getElementById('semAuto');
   const prevVal=selAuto.value;
   selAuto.innerHTML='<option value="">Todos los autos</option>'+
-    AUTOS.map(a=>`<option value="${a.id}"${a.id===prevVal?' selected':''}>${a.nombre}</option>`).join('');
+    AUTOS.map(a=>`<option value="${a.id}"${a.id===prevVal?' selected':''}>${a.nombre}</option>`).join('')+
+    `<option value="__general__"${'__general__'===prevVal?' selected':''}>General (sin auto)</option>`;
   const fAuto=selAuto.value;
-  const autos=fAuto?AUTOS.filter(a=>a.id===fAuto):AUTOS;
+  const autos=fAuto && fAuto!=='__general__'?AUTOS.filter(a=>a.id===fAuto):AUTOS;
+  const showGeneral = !fAuto || fAuto==='__general__';
   const tbody=document.getElementById('tSemanal');
   let tIng=0,tEgr=0,tInac=0,tHrs=0;
   let rows='';
 
-  autos.forEach(a=>{
+  if(fAuto!=='__general__') autos.forEach(a=>{
     const d=calcSemanaAuto(a.id,ini,fin);
     const p=getPeriodoActivo(a.id);const ch=p?getChofer(p.choferId):null;
     tIng+=d.ingresos;tEgr+=d.egresos;tInac+=d.costoInac;tHrs+=d.hrsInac;
@@ -2031,8 +2033,30 @@ function renderSemanal(){
     </tr>`;
   });
 
+  // Fila de gastos generales (sin auto específico)
+  if(showGeneral){
+    const gMovs = MOVS.filter(m=>m.autoId==='__general__' && m.fecha>=ini && m.fecha<=fin);
+    const gIng = gMovs.filter(m=>Number(m.monto)>0).reduce((s,m)=>s+Number(m.monto),0);
+    const gEgr = gMovs.filter(m=>Number(m.monto)<0).reduce((s,m)=>s+Number(m.monto),0);
+    const gBal = gIng+gEgr;
+    tIng+=gIng; tEgr+=gEgr;
+    if(gIng||gEgr||fAuto==='__general__'){
+      rows+=`<tr>
+        <td style="font-weight:500;color:var(--bl)">📋 General</td>
+        <td style="color:var(--tx3)">—</td>
+        <td class="ap">${gIng?fmt(gIng):'—'}</td>
+        <td class="an">${gEgr?fmt(gEgr):'—'}</td>
+        <td class="mo">—</td>
+        <td class="mo">—</td>
+        <td class="mo">—</td>
+        <td class="${gBal>=0?'ap':'an'} ab">${fmt(gBal)}</td>
+      </tr>`;
+    }
+  }
+
   const bal=tIng+tEgr;
-  if(rows&&autos.length>1){
+  const rowCount = (rows.match(/<tr>/g)||[]).length;
+  if(rows && rowCount>1){
     rows+=`<tr class="totrow"><td style="text-align:right">TOTAL</td>
       <td></td>
       <td class="ap">${fmt(tIng)}</td><td class="an">${fmt(tEgr)}</td>
