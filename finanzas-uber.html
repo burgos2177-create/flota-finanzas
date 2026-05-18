@@ -1997,9 +1997,14 @@ function calcSemanaAuto(autoId,ini,fin){
   const movs=MOVS.filter(m=>m.autoId===autoId&&m.fecha>=ini&&m.fecha<=fin);
   const ingresos=movs.filter(m=>m.monto>0).reduce((s,m)=>s+Number(m.monto),0);
   const egresos=movs.filter(m=>m.monto<0).reduce((s,m)=>s+Number(m.monto),0);
+  // Inactividad: registro dedicado + MOVS de categoría 'Inactividad'
   const inac=INACTIVIDAD.filter(i=>i.autoId===autoId&&i.semana===`${ini}|${fin}`);
-  const diasInac=inac.reduce((s,i)=>s+Number(i.dias),0);
-  const hrsInac=inac.reduce((s,i)=>s+Number(i.dias)*Number(i.horas),0);
+  let diasInac=inac.reduce((s,i)=>s+Number(i.dias),0);
+  let hrsInac=inac.reduce((s,i)=>s+Number(i.dias)*Number(i.horas),0);
+  movs.filter(m=>m.categoria==='Inactividad'&&Number(m.inacHorasTotales)>0).forEach(m=>{
+    const h=Number(m.inacHorasTotales)||0;
+    hrsInac+=h; diasInac+=h/24;
+  });
   const a=getAuto(autoId);
   const costoInac=a?(a.renta/7)*diasInac:0;
   return{ingresos,egresos,diasInac,hrsInac,costoInac,balance:ingresos+egresos};
@@ -2037,8 +2042,8 @@ function renderSemanal(){
       <td>${ch?ch.nombre:'—'}</td>
       <td class="ap">${d.ingresos?fmt(d.ingresos):'—'}</td>
       <td class="an">${d.egresos?fmt(d.egresos):'—'}</td>
-      <td class="mo">${d.diasInac||'—'}</td>
-      <td class="mo">${d.hrsInac||'—'}</td>
+      <td class="mo">${d.diasInac?(d.diasInac%1===0?d.diasInac:d.diasInac.toFixed(1)):'—'}</td>
+      <td class="mo">${d.hrsInac?(d.hrsInac%1===0?d.hrsInac:d.hrsInac.toFixed(1)):'—'}</td>
       <td class="an">${d.costoInac?fmt(-d.costoInac):'—'}</td>
       <td class="${d.balance>=0?'ap':'an'} ab">${fmt(d.balance)}</td>
     </tr>`;
@@ -2118,6 +2123,11 @@ function renderMensual(){
       if(!w.ini.startsWith(mesStr))return;
       const inac=INACTIVIDAD.filter(i=>i.autoId===a.id&&i.semana===`${w.ini}|${w.fin}`);
       inacCosto+=inac.reduce((s,i)=>s+(a.renta/7)*Number(i.dias),0);
+    });
+    // MOVS de categoría 'Inactividad' del mes → suman al costo informativo
+    movsMes.filter(m=>m.categoria==='Inactividad'&&Number(m.inacHorasTotales)>0).forEach(m=>{
+      const dias=Number(m.inacHorasTotales)/24;
+      inacCosto+=(a.renta/7)*dias;
     });
 
     const saldoSal=saldoEnt+ing+egr;
