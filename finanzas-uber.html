@@ -657,56 +657,29 @@ tr.d3{background:rgba(248,113,113,.04)}
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <span id="cloudStatusDot" style="font-size:22px">⚫</span>
       <div>
-        <div id="cloudStatusText" style="color:var(--tx);font-size:14px;font-weight:500">Sin configurar</div>
+        <div id="cloudStatusText" style="color:var(--tx);font-size:14px;font-weight:500">Sin sesión</div>
         <div id="lastSyncTime" style="font-size:11px;color:var(--tx3);margin-top:2px"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp" id="btnSyncNow" disabled>↕ &nbsp;Sincronizar ahora</button>
       <button class="btn bd" id="btnDisconnect" style="display:none">✕ &nbsp;Desconectar</button>
-      <button class="btn bo" id="btnRetryConnect" style="display:none" onclick="_fbDB=null;initFirebase()">↺ &nbsp;Reintentar</button>
+      <button class="btn bo" id="btnRetryConnect" style="display:none" onclick="initFirebase()">↺ &nbsp;Reintentar</button>
     </div>
-    <div id="fbRulesAlert" style="display:none;margin-top:14px;background:rgba(248,113,113,.08);border:1px solid var(--reb);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--re)">
-      🔒 <strong>Reglas de Firebase expiradas.</strong> Ve a Firebase Console y actualiza las reglas.
-      <a id="fbRulesLink" href="#" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>
-    </div>
+    <div id="fbRulesAlert" style="display:none"></div>
   </div>
 
   <div class="card">
-    <div class="ct">Configuración de Firebase</div>
-    <p style="color:var(--tx2);font-size:13px;margin-bottom:16px">
-      1. Ve a <strong style="color:var(--tx)">console.firebase.google.com</strong> y crea un proyecto gratis.<br>
-      2. Activa <strong style="color:var(--tx)">Realtime Database</strong> (modo test).<br>
-      3. En Configuración del proyecto → copia los datos y pégalos aquí.
-    </p>
-    <div class="fg">
-      <div class="fo full"><label>API Key *</label><input id="fbApiKey" type="password" placeholder="AIzaSy..."></div>
-      <div class="fo full"><label>Database URL *</label><input id="fbDbUrl" placeholder="https://mi-proyecto-default-rtdb.firebaseio.com"></div>
-      <div class="fo"><label>Project ID</label><input id="fbProjectId" placeholder="mi-proyecto"></div>
-      <div class="fo"><label>Auth Domain</label><input id="fbAuthDomain" placeholder="mi-proyecto.firebaseapp.com"></div>
-    </div>
-    <div style="margin-bottom:14px">
-      <details>
-        <summary style="cursor:pointer;color:var(--tx2);font-size:12px;font-family:var(--mo);padding:4px 0">▶ ¿Cómo configurar las reglas de Firebase?</summary>
-        <div style="margin-top:10px;background:var(--sur2);border-radius:8px;padding:14px;font-size:12px;color:var(--tx2)">
-          En Firebase Console → Realtime Database → Reglas, pega esto y publica:<br>
-          <pre style="color:var(--gr);margin-top:8px;font-family:var(--mo)">&#123;
-  "rules": &#123;
-    ".read": true,
-    ".write": true
-  &#125;
-&#125;</pre>
-          <span style="color:var(--tx3);font-size:11px">Para uso personal. Nadie más sabrá tu Database URL.</span>
-        </div>
-      </details>
-    </div>
-    <button class="btn bp" id="btnConnect">☁ &nbsp;Conectar</button>
-  </div>
-
-  <div class="card">
-    <div class="ct">📊 Integración con Finanzas Personales (fnz-psnal)</div>
+    <div class="ct">🔐 Sincronización con tu cuenta de Google</div>
     <p style="color:var(--tx2);font-size:13px;margin-bottom:14px">
-      Comparte el saldo total de la flota a tu bitácora de finanzas personales. Cada vez que cambia el saldo, se escribe el documento <code style="font-family:var(--mo);font-size:11px;color:var(--gr)">usuarios/{tu_uid}/global/empresas</code> en el proyecto Firestore <strong style="color:var(--tx)">fnz-psnal</strong>.
+      Todos los datos de la flota (autos, movimientos, choferes, mantenimiento, etc.) se guardan en el documento
+      <code style="font-family:var(--mo);font-size:11px;color:var(--gr)">usuarios/{tu_uid}/flota/data</code> dentro del proyecto Firestore
+      <strong style="color:var(--tx)">fnz-psnal</strong>. Sólo tú puedes leer/escribir gracias a las reglas basadas en
+      <code style="font-family:var(--mo);font-size:11px;color:var(--gr)">request.auth.uid</code>.
+    </p>
+    <p style="color:var(--tx3);font-size:11px;margin-bottom:14px;font-family:var(--mo)">
+      Reglas recomendadas en Firebase Console → Firestore → Rules:<br>
+      <code style="color:var(--gr);font-size:11px">match /usuarios/{uid}/&#123;document=**&#125; &#123; allow read,write: if request.auth.uid == uid; &#125;</code>
     </p>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <span id="psnDot" style="font-size:22px">⚫</span>
@@ -715,22 +688,29 @@ tr.d3{background:rgba(248,113,113,.04)}
         <div id="psnLastSync" style="font-size:11px;color:var(--tx3);margin-top:2px"></div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:10px;color:var(--tx3);font-family:var(--mo);text-transform:uppercase;letter-spacing:.6px">Saldo a compartir</div>
+        <div style="font-size:10px;color:var(--tx3);font-family:var(--mo);text-transform:uppercase;letter-spacing:.6px">Saldo total flota</div>
         <div id="psnSaldoPreview" style="font-family:var(--mo);font-size:16px;font-weight:600;color:var(--gr)">—</div>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp" id="btnPsnLogin">🔐 &nbsp;Iniciar sesión con Google</button>
-      <button class="btn bp" id="btnPsnSync" disabled>↗ &nbsp;Sincronizar ahora</button>
+      <button class="btn bp" id="btnPsnSync" disabled>↗ &nbsp;Sincronizar saldo ahora</button>
       <button class="btn bd" id="btnPsnLogout" style="display:none">✕ &nbsp;Cerrar sesión</button>
     </div>
+  </div>
+
+  <!-- Card vieja oculta: queda como compat para que el JS no truene -->
+  <div style="display:none">
+    <input id="fbApiKey"><input id="fbDbUrl"><input id="fbProjectId"><input id="fbAuthDomain">
+    <button id="btnConnect"></button>
   </div>
 
   <div class="card">
     <div class="ct">¿Cómo funciona?</div>
     <ul style="color:var(--tx2);font-size:13px;line-height:2.1;padding-left:18px">
-      <li>Cada vez que guardas un dato se sincroniza automáticamente a Firebase.</li>
-      <li>Al abrir la app en cualquier dispositivo carga los datos desde la nube.</li>
+      <li>Al iniciar sesión con Google, todos los datos viajan a Firestore (proyecto fnz-psnal).</li>
+      <li>Cada cambio se sincroniza automáticamente en ~1 segundo.</li>
+      <li>Si abres la app en otro dispositivo y entras con la misma cuenta, los datos aparecen ahí.</li>
       <li>Los datos locales (localStorage) se mantienen como respaldo offline.</li>
       <li>Puedes seguir usando Exportar/Importar JSON como backup adicional.</li>
     </ul>
@@ -913,17 +893,10 @@ tr.d3{background:rgba(248,113,113,.04)}
 
 <script>
 // ═══════════════════════════════════════════════════════════
-// FIREBASE DEFAULT CONFIG (auto-conecta en cualquier dispositivo)
+// CONFIG — Realtime Database de database-flotilla retirada.
+// Toda la sync ahora ocurre vía Firestore en fnz-psnal (auth-gated).
+// Ver PSN_CONFIG más abajo y _flotaDocRef() en la sección de CLOUD SYNC.
 // ═══════════════════════════════════════════════════════════
-const FIREBASE_DEFAULT_CONFIG = {
-  apiKey: "AIzaSyCxeDscYCLDRTvLrs8tiE-7hjxj_H92N9Q",
-  authDomain: "database-flotilla.firebaseapp.com",
-  databaseURL: "https://database-flotilla-default-rtdb.firebaseio.com",
-  projectId: "database-flotilla",
-  storageBucket: "database-flotilla.firebasestorage.app",
-  messagingSenderId: "1021807829315",
-  appId: "1:1021807829315:web:a7ebc594f7e003aeb78ff6"
-};
 
 // ═══════════════════════════════════════════════════════════
 // DATA
@@ -956,13 +929,20 @@ function save(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// CLOUD SYNC — Firebase Realtime Database
+// CLOUD SYNC — Firestore en fnz-psnal (auth-gated)
+// Migrado desde Realtime Database (database-flotilla) que fue
+// suspendido por Google por config + reglas públicas en repo
+// público. Ahora todo va a usuarios/{uid}/flota/data en Firestore.
 // ═══════════════════════════════════════════════════════════
-let _fbDB=null,_cloudSyncing=false,_syncTimer=null;
-let _cloudListenerRef=null,_cloudListenerCb=null;
+let _cloudSyncing=false,_syncTimer=null;
+let _cloudListenerUnsub=null;
+function _flotaDocRef(){
+  if(!_psnDb||!_psnUser) return null;
+  return _psnDb.collection('usuarios').doc(_psnUser.uid).collection('flota').doc('data');
+}
 
 function setCloudDot(state,customText){
-  const map={off:['⚫','Sin configurar'],syncing:['🔵','Sincronizando…'],ok:['🟢','Conectado'],error:['🔴','Error de conexión'],perms:['🔴','Reglas de Firebase expiradas']};
+  const map={off:['⚫','Sin sesión'],syncing:['🔵','Sincronizando…'],ok:['🟢','Conectado'],error:['🔴','Error de conexión'],perms:['🔴','Reglas de Firestore bloquean acceso']};
   const[dot,txt]=map[state]||map.off;
   const d=document.getElementById('cloudDot');
   const sd=document.getElementById('cloudStatusDot');
@@ -993,14 +973,14 @@ function _markSynced(){
 }
 
 function setupCloudListener(){
-  if(!_fbDB)return;
-  if(_cloudListenerRef&&_cloudListenerCb)_cloudListenerRef.off('value',_cloudListenerCb);
-  _cloudListenerRef=_fbDB.ref('flota/data');
+  const ref=_flotaDocRef();
+  if(!ref)return;
+  if(_cloudListenerUnsub){_cloudListenerUnsub();_cloudListenerUnsub=null;}
   let _first=true;
-  _cloudListenerCb=_cloudListenerRef.on('value',snap=>{
-    if(_first){_first=false;return;}// skip initial load (already done)
-    if(!snap.exists())return;
-    const d=snap.val();
+  _cloudListenerUnsub=ref.onSnapshot(snap=>{
+    if(_first){_first=false;return;}// skip initial snapshot (already loaded)
+    if(!snap.exists)return;
+    const d=snap.data();
     const remoteTs=d._ts||0;
     const localTs=S.get('ff_local_ts',0);
     if(remoteTs>localTs+500){
@@ -1011,11 +991,9 @@ function setupCloudListener(){
     }
   }, err=>{
     console.error('cloudListener error:',err);
-    const m=(err?.message||'').toLowerCase();
-    const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
-                : (err?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
-                : 'error';
-    _showFirebaseError(state, err.message);
+    const code=(err?.code||'').toString();
+    const isPerms=code==='permission-denied'||code.includes('permission');
+    _showFirebaseError(isPerms?'perms':'error', err.message);
   });
 }
 
@@ -1036,11 +1014,12 @@ function renderCurrentPage(){
 }
 
 async function loadFromCloud(){
-  if(!_fbDB)return;
-  // No catch here — let errors bubble up to initFirebase() for proper handling
-  const snap=await _fbDB.ref('flota/data').get();
-  if(!snap.exists()){syncToCloud(true);return;}
-  const d=snap.val();
+  const ref=_flotaDocRef();
+  if(!ref)return;
+  // No catch here — errors bubble up to caller for proper handling
+  const snap=await ref.get();
+  if(!snap.exists){syncToCloud(true);return;}
+  const d=snap.data();
   const remoteTs=d._ts||0;
   const localTs=S.get('ff_local_ts',0);
   if(remoteTs>localTs){
@@ -1055,7 +1034,8 @@ async function loadFromCloud(){
 }
 
 function syncToCloud(force=false){
-  if(!_fbDB)return;
+  const ref=_flotaDocRef();
+  if(!ref)return;
   if(_cloudSyncing&&!force)return;
   clearTimeout(_syncTimer);
   _syncTimer=setTimeout(async()=>{
@@ -1063,77 +1043,50 @@ function syncToCloud(force=false){
     setCloudDot('syncing');
     try{
       const ts=Date.now();
-      await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,_ts:ts});
+      await ref.set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
     }catch(e){
       console.error('syncToCloud:',e);
-      const m=(e?.message||'').toLowerCase();
-      const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
-                  : (e?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
-                  : 'error';
-      _showFirebaseError(state, e.message);
+      const code=(e?.code||'').toString();
+      const isPerms=code==='permission-denied'||code.includes('permission');
+      _showFirebaseError(isPerms?'perms':'error', e.message);
     }
     _cloudSyncing=false;
-  },800);
+  },force?0:800);
 }
 
 function _showFirebaseError(state, rawMsg){
-  // Clean up listener and reset DB reference
-  if(_cloudListenerRef&&_cloudListenerCb){_cloudListenerRef.off('value',_cloudListenerCb);_cloudListenerRef=null;_cloudListenerCb=null;}
-  _fbDB = null; // reset so the app doesn't think it's connected
-  const msg = (rawMsg||'').toString();
-  const isDeactivated = (state==='deactivated') || msg.toLowerCase().includes('deactivated') || msg.includes('423');
-  const isPerms = !isDeactivated && ((state==='perms') || msg.includes('PERMISSION_DENIED'));
-  const cfg = S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
-  const dbBase = (cfg.databaseURL||'').replace('https://','').replace('.firebaseio.com','');
-  // dbBase ends in "-default-rtdb"; for the console URL Firebase uses just that
-  if(isDeactivated){
-    setCloudDot('error', '🔒 Base de datos desactivada por Firebase');
-    const alert = document.getElementById('fbRulesAlert');
-    const link = document.getElementById('fbRulesLink');
-    if(alert){
-      alert.innerHTML = `🔒 <strong>La base de datos fue desactivada por Firebase</strong> (probablemente por inactividad >90 días en el plan gratuito).
-        Ve a Firebase Console → Realtime Database → pestaña <strong>Datos</strong> y busca el botón <strong>"Reactivar"</strong>.
-        <a id="fbRulesLink" href="https://console.firebase.google.com/project/${cfg.projectId}/database/${dbBase}/data" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>`;
-      alert.style.display = 'block';
-    }
-    toast('🔒 Base de datos desactivada — reactívala en Firebase Console (pestaña Datos)','er',8000);
-  } else if(isPerms){
-    setCloudDot('perms');
-    const det = document.querySelector('#pg-nube details');
-    if(det) det.open = true;
-    const alert = document.getElementById('fbRulesAlert');
-    if(alert){
-      alert.innerHTML = `🔒 <strong>Reglas de Firebase expiradas.</strong> Ve a Firebase Console y actualiza las reglas.
-        <a id="fbRulesLink" href="https://console.firebase.google.com/project/${cfg.projectId}/database/${dbBase}/rules" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>`;
-      alert.style.display = 'block';
-    }
-    toast('🔒 Reglas de Firebase expiradas — ve a Firebase Console y actualiza las reglas','er',7000);
+  if(_cloudListenerUnsub){_cloudListenerUnsub();_cloudListenerUnsub=null;}
+  const msg=(rawMsg||'').toString();
+  const isPerms=(state==='perms')||msg.includes('permission')||msg.toLowerCase().includes('permission_denied');
+  if(isPerms){
+    setCloudDot('perms', '🔒 Reglas de Firestore bloquean acceso');
+    toast('🔒 Las reglas de Firestore no permiten escribir en tu UID. Revisa las reglas del proyecto fnz-psnal.','er',7000);
   } else {
     setCloudDot('error', 'Error: '+(msg||'conexión fallida'));
-    toast('Error de conexión con Firebase: '+(msg||''),'er',5000);
+    toast('Error de sync: '+(msg||''),'er',5000);
   }
-  const btnR = document.getElementById('btnRetryConnect');
-  if(btnR) btnR.style.display = 'inline-flex';
+  const btnR=document.getElementById('btnRetryConnect');
+  if(btnR) btnR.style.display='inline-flex';
 }
 
 async function initFirebase(){
-  const cfg=S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
-  if(!cfg?.apiKey||!cfg?.databaseURL){setCloudDot('off');return;}
+  // La inicialización ahora ocurre vía _psnInitFirebase (auth-gated).
+  // Esta función queda como entry-point que dispara una sync manual
+  // cuando ya hay sesión activa. Si no hay sesión, el botón de login
+  // en la pestaña Nube se encarga.
+  if(!_psnUser||!_psnDb){
+    setCloudDot('off','Esperando login con Google…');
+    return;
+  }
   try{
-    if(typeof firebase==='undefined'){setCloudDot('error','Firebase SDK no disponible');return;}
-    let defaultApp;
-    try{ defaultApp = firebase.app(); }catch(_){ defaultApp = firebase.initializeApp(cfg); }
-    _fbDB = defaultApp.database();
     setCloudDot('syncing');
-    await loadFromCloud(); // throws on permission denied or network error — no catch inside
+    await loadFromCloud();
     setupCloudListener();
-    _markSynced(); // only reached if loadFromCloud succeeded
-    const btnD=document.getElementById('btnDisconnect');
+    _markSynced();
     const btnS=document.getElementById('btnSyncNow');
     const btnR=document.getElementById('btnRetryConnect');
-    if(btnD)btnD.style.display='';
     if(btnS)btnS.disabled=false;
     if(btnR)btnR.style.display='none';
     const savedTs=S.get('ff_last_sync',null);
@@ -1141,11 +1094,9 @@ async function initFirebase(){
     if(el&&savedTs)el.textContent='Última sync: '+savedTs;
   }catch(e){
     console.error('initFirebase:',e);
-    const m=(e?.message||'').toLowerCase();
-    const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
-                : (e?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
-                : 'error';
-    _showFirebaseError(state, e.message);
+    const code=(e?.code||'').toString();
+    const isPerms=code==='permission-denied'||code.includes('permission');
+    _showFirebaseError(isPerms?'perms':'error', e.message);
   }
 }
 
@@ -2766,41 +2717,21 @@ document.getElementById('importFile').addEventListener('change',function(){
 });
 
 // ═══════════════════════════════════════════════════════════
-// CLOUD CONFIG HANDLERS
+// CLOUD HANDLERS — ahora el login/logout de Google maneja la sesión
+// (los botones btnConnect/fbApiKey/etc. quedaron ocultos por compat)
 // ═══════════════════════════════════════════════════════════
-document.getElementById('btnConnect').addEventListener('click',async()=>{
-  const apiKey=document.getElementById('fbApiKey').value.trim();
-  const databaseURL=document.getElementById('fbDbUrl').value.trim();
-  const projectId=document.getElementById('fbProjectId').value.trim();
-  const authDomain=document.getElementById('fbAuthDomain').value.trim();
-  if(!apiKey||!databaseURL)return toast('API Key y Database URL son requeridos','er');
-  if(_fbDB)return toast('Ya conectado. Recarga la página para re-configurar.','er');
-  S.set('ff_cloud_cfg',{apiKey,databaseURL,projectId,authDomain});
-  await initFirebase();
-  if(_fbDB)toast('☁ Conectado a Firebase ✓');
-});
-
-document.getElementById('btnDisconnect').addEventListener('click',async()=>{
-  if(!await confirmar('¿Desconectar la nube? Los datos locales se mantienen.','Desconectar','bd'))return;
-  S.set('ff_cloud_cfg',null);_fbDB=null;
-  if(_cloudListenerRef&&_cloudListenerCb)_cloudListenerRef.off('value',_cloudListenerCb);
-  _cloudListenerRef=null;_cloudListenerCb=null;
-  setCloudDot('off');
-  document.getElementById('btnDisconnect').style.display='none';
-  document.getElementById('btnSyncNow').disabled=true;
-  toast('Desconectado de la nube');
-});
-
 document.getElementById('btnSyncNow').addEventListener('click',()=>syncToCloud(true));
 
-// Pre-fill saved config
+// El botón "Reintentar" en la card de estado dispara una re-sync sin reload
+const btnDisconnectEl=document.getElementById('btnDisconnect');
+if(btnDisconnectEl) btnDisconnectEl.addEventListener('click',async()=>{
+  if(!await confirmar('¿Cerrar sesión? Los datos locales se mantienen.','Cerrar sesión','bd'))return;
+  if(_psnAuth) try{ await _psnAuth.signOut(); }catch(e){console.error(e);}
+  toast('Sesión cerrada');
+});
+
+// Mostrar última sync guardada al cargar
 (()=>{
-  const cfg=S.get('ff_cloud_cfg',null);
-  if(!cfg)return;
-  if(cfg.apiKey)document.getElementById('fbApiKey').value=cfg.apiKey;
-  if(cfg.databaseURL)document.getElementById('fbDbUrl').value=cfg.databaseURL;
-  if(cfg.projectId)document.getElementById('fbProjectId').value=cfg.projectId;
-  if(cfg.authDomain)document.getElementById('fbAuthDomain').value=cfg.authDomain;
   const savedTs=S.get('ff_last_sync',null);
   if(savedTs){const el=document.getElementById('lastSyncTime');if(el)el.textContent='Última sync: '+savedTs;}
 })();
@@ -4343,10 +4274,34 @@ async function _psnInitFirebase(){
     _psnApp = firebase.initializeApp(PSN_CONFIG, 'personal');
     _psnAuth = _psnApp.auth();
     _psnDb = _psnApp.firestore();
-    _psnAuth.onAuthStateChanged(user=>{
+    _psnAuth.onAuthStateChanged(async user=>{
       _psnUser = user;
       _psnUpdateUI();
-      if(user) _psnSyncSaldo(); // sync inicial al detectar sesión persistida
+      if(user){
+        _psnSyncSaldo(); // sync del saldo a la lista de empresas (lo de siempre)
+        // NUEVO: dispara el sync de toda la flota (autos/movs/etc) a Firestore
+        try{
+          setCloudDot('syncing');
+          await loadFromCloud();
+          setupCloudListener();
+          _markSynced();
+          const btnS=document.getElementById('btnSyncNow');
+          const btnR=document.getElementById('btnRetryConnect');
+          if(btnS)btnS.disabled=false;
+          if(btnR)btnR.style.display='none';
+        }catch(e){
+          console.error('flota sync init:',e);
+          const code=(e?.code||'').toString();
+          const isPerms=code==='permission-denied'||code.includes('permission');
+          _showFirebaseError(isPerms?'perms':'error', e.message);
+        }
+      } else {
+        // Logout: limpiar listener y poner UI en 'off'
+        if(_cloudListenerUnsub){_cloudListenerUnsub();_cloudListenerUnsub=null;}
+        setCloudDot('off','Esperando login con Google…');
+        const btnS=document.getElementById('btnSyncNow');
+        if(btnS)btnS.disabled=true;
+      }
     });
   }catch(e){ console.error('psn init:', e); }
   return _psnApp;
@@ -4432,7 +4387,9 @@ if(_psnLast){
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
-initFirebase();
+// El sync a Firestore lo dispara onAuthStateChanged en _psnInitFirebase()
+// (que ya se ejecutó arriba). Mientras tanto el app trabaja con localStorage.
+setCloudDot('off','Esperando login con Google…');
 renderDash();
 // ═══════════════════════════════════════════════════════════
 // EDITAR MOVIMIENTO
