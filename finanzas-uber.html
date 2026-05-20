@@ -2737,7 +2737,7 @@ function renderDocsChofer(choferId){
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════
 document.getElementById('btnExport').addEventListener('click',()=>{
-  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,exportado:new Date().toISOString()},null,2);
+  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,exportado:new Date().toISOString()},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download=`flota-finanzas-${today()}.json`;a.click();
@@ -2756,8 +2756,9 @@ document.getElementById('importFile').addEventListener('change',function(){
       const C=d.CHOFERES||d.choferes||[];const P=d.PERIODOS||d.periodos||[];
       const I=d.INACTIVIDAD||d.inactividad||[];
       const CT=d.CONTRATOS||[];const DC=d.DOCS||[];const TL=d.TALLERES||[];
+      const MT=d.MANTENIMIENTO||{};
       if(!await confirmar(`Importar ${A.length} autos, ${M.length} movimientos y ${C.length} choferes?`,'Importar','bp'))return;
-      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;
+      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;MANTENIMIENTO=MT;
       save();renderDash();toast('✓ Datos importados');
     }catch{toast('Archivo no válido','er');}
   };
