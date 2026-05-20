@@ -1011,8 +1011,11 @@ function setupCloudListener(){
     }
   }, err=>{
     console.error('cloudListener error:',err);
-    const isPerms=(err?.code==='PERMISSION_DENIED')||(err?.message||'').includes('PERMISSION_DENIED');
-    _showFirebaseError(isPerms?'perms':'error', err.message);
+    const m=(err?.message||'').toLowerCase();
+    const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
+                : (err?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
+                : 'error';
+    _showFirebaseError(state, err.message);
   });
 }
 
@@ -1065,8 +1068,11 @@ function syncToCloud(force=false){
       _markSynced();
     }catch(e){
       console.error('syncToCloud:',e);
-      const isPerms=(e?.code==='PERMISSION_DENIED')||(e?.message||'').includes('PERMISSION_DENIED');
-      _showFirebaseError(isPerms?'perms':'error', e.message);
+      const m=(e?.message||'').toLowerCase();
+      const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
+                  : (e?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
+                  : 'error';
+      _showFirebaseError(state, e.message);
     }
     _cloudSyncing=false;
   },800);
@@ -1076,27 +1082,38 @@ function _showFirebaseError(state, rawMsg){
   // Clean up listener and reset DB reference
   if(_cloudListenerRef&&_cloudListenerCb){_cloudListenerRef.off('value',_cloudListenerCb);_cloudListenerRef=null;_cloudListenerCb=null;}
   _fbDB = null; // reset so the app doesn't think it's connected
-  const isPerms = (state==='perms') || ((rawMsg||'').includes('PERMISSION_DENIED'));
-  if(isPerms){
-    setCloudDot('perms');
-    // Auto-expand the rules instructions
-    const det = document.querySelector('#pg-nube details');
-    if(det) det.open = true;
-    // Show and configure the rules alert with direct link
+  const msg = (rawMsg||'').toString();
+  const isDeactivated = (state==='deactivated') || msg.toLowerCase().includes('deactivated') || msg.includes('423');
+  const isPerms = !isDeactivated && ((state==='perms') || msg.includes('PERMISSION_DENIED'));
+  const cfg = S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
+  const dbBase = (cfg.databaseURL||'').replace('https://','').replace('.firebaseio.com','');
+  // dbBase ends in "-default-rtdb"; for the console URL Firebase uses just that
+  if(isDeactivated){
+    setCloudDot('error', '🔒 Base de datos desactivada por Firebase');
     const alert = document.getElementById('fbRulesAlert');
     const link = document.getElementById('fbRulesLink');
-    if(alert) alert.style.display = 'block';
-    const cfg = S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
-    if(link && cfg?.projectId){
-      const dbName = (cfg.databaseURL||'').replace('https://','').replace('.firebaseio.com','').replace('-default-rtdb','');
-      link.href = `https://console.firebase.google.com/project/${cfg.projectId}/database/${dbName}-default-rtdb/rules`;
+    if(alert){
+      alert.innerHTML = `🔒 <strong>La base de datos fue desactivada por Firebase</strong> (probablemente por inactividad >90 días en el plan gratuito).
+        Ve a Firebase Console → Realtime Database → pestaña <strong>Datos</strong> y busca el botón <strong>"Reactivar"</strong>.
+        <a id="fbRulesLink" href="https://console.firebase.google.com/project/${cfg.projectId}/database/${dbBase}/data" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>`;
+      alert.style.display = 'block';
+    }
+    toast('🔒 Base de datos desactivada — reactívala en Firebase Console (pestaña Datos)','er',8000);
+  } else if(isPerms){
+    setCloudDot('perms');
+    const det = document.querySelector('#pg-nube details');
+    if(det) det.open = true;
+    const alert = document.getElementById('fbRulesAlert');
+    if(alert){
+      alert.innerHTML = `🔒 <strong>Reglas de Firebase expiradas.</strong> Ve a Firebase Console y actualiza las reglas.
+        <a id="fbRulesLink" href="https://console.firebase.google.com/project/${cfg.projectId}/database/${dbBase}/rules" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>`;
+      alert.style.display = 'block';
     }
     toast('🔒 Reglas de Firebase expiradas — ve a Firebase Console y actualiza las reglas','er',7000);
   } else {
-    setCloudDot('error', 'Error: '+(rawMsg||'conexión fallida'));
-    toast('Error de conexión con Firebase: '+(rawMsg||''),'er',5000);
+    setCloudDot('error', 'Error: '+(msg||'conexión fallida'));
+    toast('Error de conexión con Firebase: '+(msg||''),'er',5000);
   }
-  // Show retry button
   const btnR = document.getElementById('btnRetryConnect');
   if(btnR) btnR.style.display = 'inline-flex';
 }
@@ -1124,8 +1141,11 @@ async function initFirebase(){
     if(el&&savedTs)el.textContent='Última sync: '+savedTs;
   }catch(e){
     console.error('initFirebase:',e);
-    const isPerms=(e?.code==='PERMISSION_DENIED')||(e?.message||'').includes('PERMISSION_DENIED');
-    _showFirebaseError(isPerms?'perms':'error', e.message);
+    const m=(e?.message||'').toLowerCase();
+    const state = m.includes('deactivated')||m.includes('423') ? 'deactivated'
+                : (e?.code==='PERMISSION_DENIED'||m.includes('permission_denied')) ? 'perms'
+                : 'error';
+    _showFirebaseError(state, e.message);
   }
 }
 
