@@ -113,7 +113,7 @@ tr.d3{background:rgba(248,113,113,.04)}
 .md{background:var(--sur);border:1px solid var(--bor2);border-radius:14px;padding:24px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
 .mt{font-size:17px;font-weight:600;margin-bottom:18px}
 /* TOAST */
-#toast{position:fixed;bottom:20px;right:20px;background:var(--sur2);border:1px solid var(--bor2);border-radius:9px;padding:11px 16px;font-size:13px;color:var(--tx);box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:9999;transform:translateY(70px);opacity:0;transition:all .28s ease;max-width:280px}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--sur2);border:1px solid var(--bor2);border-radius:9px;padding:11px 16px;font-size:13px;color:var(--tx);box-shadow:0 8px 30px rgba(0,0,0,.4);z-index:9999;transform:translateY(70px);opacity:0;transition:all .28s ease;max-width:380px}
 #toast.on{transform:translateY(0);opacity:1}
 #toast.ok{border-color:var(--grb)}#toast.er{border-color:var(--reb)}
 /* MOBILE */
@@ -664,6 +664,11 @@ tr.d3{background:rgba(248,113,113,.04)}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp" id="btnSyncNow" disabled>↕ &nbsp;Sincronizar ahora</button>
       <button class="btn bd" id="btnDisconnect" style="display:none">✕ &nbsp;Desconectar</button>
+      <button class="btn bo" id="btnRetryConnect" style="display:none" onclick="_fbDB=null;initFirebase()">↺ &nbsp;Reintentar</button>
+    </div>
+    <div id="fbRulesAlert" style="display:none;margin-top:14px;background:rgba(248,113,113,.08);border:1px solid var(--reb);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--re)">
+      🔒 <strong>Reglas de Firebase expiradas.</strong> Ve a Firebase Console y actualiza las reglas.
+      <a id="fbRulesLink" href="#" target="_blank" style="color:var(--ye);margin-left:6px;text-decoration:underline">Abrir Firebase Console →</a>
     </div>
   </div>
 
@@ -956,15 +961,15 @@ function save(){
 let _fbDB=null,_cloudSyncing=false,_syncTimer=null;
 let _cloudListenerRef=null,_cloudListenerCb=null;
 
-function setCloudDot(state){
-  const map={off:['⚫','Sin configurar'],syncing:['🔵','Sincronizando…'],ok:['🟢','Conectado'],error:['🔴','Error de conexión']};
+function setCloudDot(state,customText){
+  const map={off:['⚫','Sin configurar'],syncing:['🔵','Sincronizando…'],ok:['🟢','Conectado'],error:['🔴','Error de conexión'],perms:['🔴','Reglas de Firebase expiradas']};
   const[dot,txt]=map[state]||map.off;
   const d=document.getElementById('cloudDot');
   const sd=document.getElementById('cloudStatusDot');
   const st=document.getElementById('cloudStatusText');
   if(d)d.textContent=dot;
   if(sd)sd.textContent=dot;
-  if(st)st.textContent=txt;
+  if(st)st.textContent=customText||txt;
 }
 
 function _applyCloudData(d){
@@ -1004,6 +1009,10 @@ function setupCloudListener(){
       _markSynced();
       renderCurrentPage();
     }
+  }, err=>{
+    console.error('cloudListener error:',err);
+    const isPerms=(err?.code==='PERMISSION_DENIED')||(err?.message||'').includes('PERMISSION_DENIED');
+    _showFirebaseError(isPerms?'perms':'error', err.message);
   });
 }
 
@@ -1025,22 +1034,21 @@ function renderCurrentPage(){
 
 async function loadFromCloud(){
   if(!_fbDB)return;
-  try{
-    const snap=await _fbDB.ref('flota/data').get();
-    if(!snap.exists()){await syncToCloud(true);return;}
-    const d=snap.val();
-    const remoteTs=d._ts||0;
-    const localTs=S.get('ff_local_ts',0);
-    if(remoteTs>localTs){
-      // La nube tiene datos más recientes → aplicar
-      _applyCloudData(d);
-      S.set('ff_local_ts',remoteTs);
-      renderDash();
-    } else {
-      // Local es igual o más reciente → subir a la nube
-      syncToCloud(true);
-    }
-  }catch(e){console.error('loadFromCloud:',e);setCloudDot('error');}
+  // No catch here — let errors bubble up to initFirebase() for proper handling
+  const snap=await _fbDB.ref('flota/data').get();
+  if(!snap.exists()){syncToCloud(true);return;}
+  const d=snap.val();
+  const remoteTs=d._ts||0;
+  const localTs=S.get('ff_local_ts',0);
+  if(remoteTs>localTs){
+    // La nube tiene datos más recientes → aplicar
+    _applyCloudData(d);
+    S.set('ff_local_ts',remoteTs);
+    renderDash();
+  } else {
+    // Local es igual o más reciente → subir a la nube
+    syncToCloud(true);
+  }
 }
 
 function syncToCloud(force=false){
@@ -1055,35 +1063,69 @@ function syncToCloud(force=false){
       await _fbDB.ref('flota/data').set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
-    }catch(e){console.error('syncToCloud:',e);setCloudDot('error');}
+    }catch(e){
+      console.error('syncToCloud:',e);
+      const isPerms=(e?.code==='PERMISSION_DENIED')||(e?.message||'').includes('PERMISSION_DENIED');
+      _showFirebaseError(isPerms?'perms':'error', e.message);
+    }
     _cloudSyncing=false;
   },800);
+}
+
+function _showFirebaseError(state, rawMsg){
+  // Clean up listener and reset DB reference
+  if(_cloudListenerRef&&_cloudListenerCb){_cloudListenerRef.off('value',_cloudListenerCb);_cloudListenerRef=null;_cloudListenerCb=null;}
+  _fbDB = null; // reset so the app doesn't think it's connected
+  const isPerms = (state==='perms') || ((rawMsg||'').includes('PERMISSION_DENIED'));
+  if(isPerms){
+    setCloudDot('perms');
+    // Auto-expand the rules instructions
+    const det = document.querySelector('#pg-nube details');
+    if(det) det.open = true;
+    // Show and configure the rules alert with direct link
+    const alert = document.getElementById('fbRulesAlert');
+    const link = document.getElementById('fbRulesLink');
+    if(alert) alert.style.display = 'block';
+    const cfg = S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
+    if(link && cfg?.projectId){
+      const dbName = (cfg.databaseURL||'').replace('https://','').replace('.firebaseio.com','').replace('-default-rtdb','');
+      link.href = `https://console.firebase.google.com/project/${cfg.projectId}/database/${dbName}-default-rtdb/rules`;
+    }
+    toast('🔒 Reglas de Firebase expiradas — ve a Firebase Console y actualiza las reglas','er',7000);
+  } else {
+    setCloudDot('error', 'Error: '+(rawMsg||'conexión fallida'));
+    toast('Error de conexión con Firebase: '+(rawMsg||''),'er',5000);
+  }
+  // Show retry button
+  const btnR = document.getElementById('btnRetryConnect');
+  if(btnR) btnR.style.display = 'inline-flex';
 }
 
 async function initFirebase(){
   const cfg=S.get('ff_cloud_cfg',null)||FIREBASE_DEFAULT_CONFIG;
   if(!cfg?.apiKey||!cfg?.databaseURL){setCloudDot('off');return;}
   try{
-    if(typeof firebase==='undefined'){setCloudDot('error');return;}
+    if(typeof firebase==='undefined'){setCloudDot('error','Firebase SDK no disponible');return;}
     let defaultApp;
     try{ defaultApp = firebase.app(); }catch(_){ defaultApp = firebase.initializeApp(cfg); }
     _fbDB = defaultApp.database();
     setCloudDot('syncing');
-    await loadFromCloud();
+    await loadFromCloud(); // throws on permission denied or network error — no catch inside
     setupCloudListener();
-    _markSynced();
+    _markSynced(); // only reached if loadFromCloud succeeded
     const btnD=document.getElementById('btnDisconnect');
     const btnS=document.getElementById('btnSyncNow');
+    const btnR=document.getElementById('btnRetryConnect');
     if(btnD)btnD.style.display='';
     if(btnS)btnS.disabled=false;
+    if(btnR)btnR.style.display='none';
     const savedTs=S.get('ff_last_sync',null);
     const el=document.getElementById('lastSyncTime');
     if(el&&savedTs)el.textContent='Última sync: '+savedTs;
   }catch(e){
     console.error('initFirebase:',e);
-    setCloudDot('error');
-    const st=document.getElementById('cloudStatusText');
-    if(st)st.textContent='Error: '+e.message;
+    const isPerms=(e?.code==='PERMISSION_DENIED')||(e?.message||'').includes('PERMISSION_DENIED');
+    _showFirebaseError(isPerms?'perms':'error', e.message);
   }
 }
 
@@ -1096,10 +1138,10 @@ const fdate=d=>{if(!d)return'—';const[y,m,di]=d.split('-');return`${di}/${m}/$
 const today=()=>new Date().toISOString().slice(0,10);
 const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
-function toast(msg,type='ok'){
+function toast(msg,type='ok',dur=3000){
   const t=document.getElementById('toast');
   t.textContent=msg;t.className='on '+type;
-  clearTimeout(t._);t._=setTimeout(()=>t.className='',3000);
+  clearTimeout(t._);t._=setTimeout(()=>t.className='',dur);
 }
 
 function confirmar(msg,btnTexto='Eliminar',btnClase='bd'){
