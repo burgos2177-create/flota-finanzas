@@ -50,6 +50,7 @@ select option{background:var(--sur2)}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-family:var(--fn);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;user-select:none}
 .bp{background:var(--gr);color:#071a0d}.bp:hover{background:#6ee7a0}
+.kmTab.on{background:var(--grd);color:var(--gr);border-color:var(--grb)}
 .bg{background:transparent;color:var(--tx2);border:1px solid var(--bor2)}.bg:hover{background:var(--sur2);color:var(--tx)}
 .bd{background:var(--red);color:var(--re);border:1px solid var(--reb)}.bd:hover{background:rgba(248,113,113,.2)}
 .bo{background:var(--ord);color:var(--or);border:1px solid rgba(251,146,60,.3)}
@@ -777,6 +778,41 @@ tr.d3{background:rgba(248,113,113,.04)}
 
 <div id="toast"></div>
 
+<!-- MODAL KILOMETRAJE -->
+<div class="mb" id="modalKm">
+  <div class="md" style="max-width:560px">
+    <div class="mt" id="modalKmTit">Actualizar kilometraje</div>
+    <p style="font-size:12px;color:var(--tx2);margin-bottom:14px" id="modalKmCtx">—</p>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button class="btn bg sm kmTab on" data-tab="gps" type="button">↗ Solo GPS</button>
+      <button class="btn bg sm kmTab" data-tab="anclaje" type="button">⚓ Anclaje (lectura real + GPS)</button>
+    </div>
+    <div id="kmInfo" style="background:var(--sur2);border-radius:7px;padding:11px 13px;margin-bottom:14px;font-size:12px;color:var(--tx2);line-height:1.7"></div>
+    <div class="fg">
+      <div class="fo"><label>Fecha *</label><input type="date" id="kmFecha"></div>
+      <div class="fo" id="kmRealField"><label>Kilometraje real (odómetro) *</label><input type="number" id="kmReal" placeholder="161452"></div>
+      <div class="fo"><label id="kmGpsLabel">Kilometraje GPS *</label><input type="number" id="kmGps" placeholder="4841"></div>
+      <div class="fo full"><label>Nota</label><input type="text" id="kmNota" placeholder="Ej: Servicio, revisión, GPS reinstalado..."></div>
+    </div>
+    <input type="hidden" id="kmAutoId">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn bg" id="btnCancelKm">Cancelar</button>
+      <button class="btn bp" id="btnOkKm">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HISTORIAL KM -->
+<div class="mb" id="modalKmHist">
+  <div class="md" style="max-width:680px">
+    <div class="fb m16">
+      <div class="mt" id="modalKmHistTit">Historial de kilometraje</div>
+      <button class="btn bg sm" onclick="document.getElementById('modalKmHist').classList.remove('on')">✕</button>
+    </div>
+    <div id="kmHistBody" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
 <!-- MODAL CONTRATO GENERAR -->
 <div class="mb" id="modalContrato">
   <div class="md" style="max-width:560px">
@@ -914,6 +950,7 @@ let CONTRATOS  = S.get('ff_contratos',[]);
 let DOCS       = S.get('ff_docs',[]);
 let TALLERES   = S.get('ff_talleres',[]);
 let MANTENIMIENTO = S.get('ff_mant',{});
+let KMS        = S.get('ff_kms',{}); // {autoId: [{id,fecha,km_gps,km_real,esAnclaje,nota}, ...]}
 
 function save(){
   S.set('ff_autos',AUTOS);S.set('ff_movs',MOVS);
@@ -923,9 +960,83 @@ function save(){
   S.set('ff_docs',DOCS);
   S.set('ff_talleres',TALLERES);
   S.set('ff_mant',MANTENIMIENTO);
+  S.set('ff_kms',KMS);
   // Marcar timestamp local inmediatamente para proteger cambios antes del sync
   S.set('ff_local_ts',Date.now());
   syncToCloud();
+}
+
+// ═══════════════════════════════════════════════════════════
+// KMS — kilometraje real + GPS por auto (bidireccional Autos↔Mantenimiento)
+// ═══════════════════════════════════════════════════════════
+// Modelo:
+//   KMS[autoId] = [{id, fecha, km_gps, km_real, esAnclaje, nota}, ...]
+//   - esAnclaje:true  → el usuario tomó lectura real del odómetro + GPS en ese día
+//   - esAnclaje:false → solo se actualizó el GPS; km_real se calculó al guardar
+//
+// Fórmula para una lectura GPS sola:
+//   km_real = ultimoAnclaje.km_real + (km_gps_nuevo - ultimoAnclaje.km_gps)
+// ═══════════════════════════════════════════════════════════
+function kmsDelAuto(autoId){
+  const arr = KMS[autoId]||[];
+  return [...arr].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'') || (a._ts||0)-(b._ts||0));
+}
+function ultimoRegistroKm(autoId){
+  const arr = kmsDelAuto(autoId);
+  return arr.length ? arr[arr.length-1] : null;
+}
+function ultimoAnclajeKm(autoId){
+  const arr = kmsDelAuto(autoId);
+  for(let i=arr.length-1; i>=0; i--){ if(arr[i].esAnclaje) return arr[i]; }
+  return null;
+}
+function kmActual(autoId){
+  const r = ultimoRegistroKm(autoId);
+  return r ? Number(r.km_real)||0 : null;
+}
+function kmGpsActual(autoId){
+  const r = ultimoRegistroKm(autoId);
+  return r ? Number(r.km_gps)||0 : null;
+}
+// Agrega un anclaje (ambas lecturas manuales — reseteo de baseline)
+function addAnclajeKm(autoId, fecha, km_real, km_gps, nota){
+  if(!KMS[autoId]) KMS[autoId]=[];
+  KMS[autoId].push({
+    id: uid(),
+    fecha: fecha||today(),
+    km_real: Number(km_real)||0,
+    km_gps: Number(km_gps)||0,
+    esAnclaje: true,
+    nota: nota||'',
+    _ts: Date.now()
+  });
+  save();
+}
+// Agrega solo lectura GPS — calcula km_real automáticamente desde el último anclaje
+function addGpsUpdateKm(autoId, fecha, km_gps, nota){
+  const anc = ultimoAnclajeKm(autoId);
+  if(!anc) return { error: 'Necesitas crear un anclaje primero (lectura real + GPS).' };
+  const gpsDiff = (Number(km_gps)||0) - (Number(anc.km_gps)||0);
+  if(gpsDiff < 0) return { error: 'El GPS nuevo es menor que el del último anclaje. ¿El GPS se reinició? Crea un nuevo anclaje.' };
+  const km_real = (Number(anc.km_real)||0) + gpsDiff;
+  if(!KMS[autoId]) KMS[autoId]=[];
+  KMS[autoId].push({
+    id: uid(),
+    fecha: fecha||today(),
+    km_real,
+    km_gps: Number(km_gps)||0,
+    esAnclaje: false,
+    nota: nota||'',
+    _ts: Date.now()
+  });
+  save();
+  return { ok:true, km_real };
+}
+function eliminarKmRegistro(autoId, regId){
+  if(!KMS[autoId]) return;
+  KMS[autoId] = KMS[autoId].filter(r=>r.id!==regId);
+  if(KMS[autoId].length===0) delete KMS[autoId];
+  save();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -962,6 +1073,7 @@ function _applyCloudData(d){
   if(d.DOCS){DOCS=d.DOCS;S.set('ff_docs',DOCS);}
   if(d.TALLERES){TALLERES=d.TALLERES;S.set('ff_talleres',TALLERES);}
   if(d.MANTENIMIENTO){MANTENIMIENTO=d.MANTENIMIENTO;S.set('ff_mant',MANTENIMIENTO);}
+  if(d.KMS){KMS=d.KMS;S.set('ff_kms',KMS);}
 }
 
 function _markSynced(){
@@ -1043,7 +1155,7 @@ function syncToCloud(force=false){
     setCloudDot('syncing');
     try{
       const ts=Date.now();
-      await ref.set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,_ts:ts});
+      await ref.set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
     }catch(e){
@@ -1622,6 +1734,10 @@ function renderAutos(){
     const ch=p?getChofer(p.choferId):null;
     const div=document.createElement('div');
     div.className='cc'+(a.estado==='inactivo'?' in':'');
+    const kmReal = kmActual(a.id);
+    const kmGps  = kmGpsActual(a.id);
+    const ultKm  = ultimoRegistroKm(a.id);
+    const fmtKm  = n => Number(n).toLocaleString('es-MX');
     div.innerHTML=`
       <div class="fb m4">
         <div><div style="font-size:15px;font-weight:600;color:var(--tx)">${a.nombre}</div><div style="font-family:var(--mo);font-size:11px;color:var(--tx3)">${a.placas}</div></div>
@@ -1631,6 +1747,19 @@ function renderAutos(){
       <div style="font-size:12px;color:var(--tx3)">Renta semanal: <strong>${fmt(a.renta)}</strong></div>
       <div style="font-size:12px;color:var(--tx3)">${ch?'👤 <strong>'+ch.nombre+'</strong>':'<span style="color:var(--or)">⚠ Sin chofer</span>'}</div>
       <div style="font-size:12px;color:var(--tx3)">${mc} movimiento${mc!==1?'s':''}</div>
+      <div style="background:var(--sur2);border-radius:7px;padding:8px 10px;margin-top:10px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="color:var(--tx3);font-size:10px;font-family:var(--mo);letter-spacing:.5px;text-transform:uppercase">Kilometraje</span>
+          ${ultKm?`<span style="color:var(--tx3);font-size:10px;font-family:var(--mo)">${ultKm.fecha}</span>`:''}
+        </div>
+        ${kmReal!==null
+          ? `<div style="display:flex;justify-content:space-between;gap:6px"><div><span style="color:var(--gr);font-family:var(--mo);font-weight:600;font-size:14px">${fmtKm(kmReal)} km</span><span style="color:var(--tx3);font-size:11px"> real</span></div><div><span style="color:var(--bl);font-family:var(--mo);font-size:12px">${fmtKm(kmGps)}</span><span style="color:var(--tx3);font-size:11px"> gps</span></div></div>`
+          : `<div style="color:var(--ye);font-size:12px">⚠ Sin anclaje aún</div>`}
+        <div style="display:flex;gap:5px;margin-top:7px">
+          <button class="btn bp sm btnKmUpdate" style="flex:1;padding:3px 8px;font-size:11px">${kmReal!==null?'↗ Actualizar km':'⚓ Crear anclaje'}</button>
+          ${kmReal!==null?'<button class="btn bg sm btnKmHist" style="padding:3px 8px;font-size:11px">📋</button>':''}
+        </div>
+      </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
         <button class="btn bg sm btnBitAuto">Bitácora</button>
         <button class="btn bo sm btnCambioChofer">Cambiar chofer</button>
@@ -1640,6 +1769,8 @@ function renderAutos(){
     div.querySelector('.btnBitAuto').addEventListener('click',()=>verBitacoraAuto(a.id));
     div.querySelector('.btnCambioChofer').addEventListener('click',()=>abrirCambioChofer(a.id));
     div.querySelector('.btnEditAuto').addEventListener('click',()=>abrirModalAuto(a.id));
+    div.querySelector('.btnKmUpdate').addEventListener('click',()=>abrirModalKm(a.id));
+    const btnH=div.querySelector('.btnKmHist'); if(btnH) btnH.addEventListener('click',()=>verHistorialKm(a.id));
     div.querySelector('.btnDelAuto').addEventListener('click',async()=>{
       const mc2=MOVS.filter(m=>m.autoId===a.id).length;
       if(!await confirmar(`¿Eliminar "${a.nombre}"?${mc2?` Se eliminarán ${mc2} movimientos.`:''}`))return;
@@ -2688,7 +2819,7 @@ function renderDocsChofer(choferId){
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════
 document.getElementById('btnExport').addEventListener('click',()=>{
-  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,exportado:new Date().toISOString()},null,2);
+  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,exportado:new Date().toISOString()},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download=`flota-finanzas-${today()}.json`;a.click();
@@ -2708,8 +2839,9 @@ document.getElementById('importFile').addEventListener('change',function(){
       const I=d.INACTIVIDAD||d.inactividad||[];
       const CT=d.CONTRATOS||[];const DC=d.DOCS||[];const TL=d.TALLERES||[];
       const MT=d.MANTENIMIENTO||{};
+      const KM=d.KMS||{};
       if(!await confirmar(`Importar ${A.length} autos, ${M.length} movimientos y ${C.length} choferes?`,'Importar','bp'))return;
-      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;MANTENIMIENTO=MT;
+      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;MANTENIMIENTO=MT;KMS=KM;
       save();renderDash();toast('✓ Datos importados');
     }catch{toast('Archivo no válido','er');}
   };
@@ -3412,12 +3544,45 @@ const TTL = {
   'Líquido de frenos':          {km:50000, days:730},
   'Bomba de frenos':            {km:100000,days:1825},
 };
+// Devuelve el km_real estimado del auto en una fecha dada (busca el registro
+// más cercano y aplica la fórmula del anclaje). Retorna null si no hay datos.
+function kmAlDia(autoId, fecha){
+  const arr = kmsDelAuto(autoId);
+  if(!arr.length) return null;
+  // Filtra registros con fecha <= fecha objetivo y toma el último
+  const previos = arr.filter(r => (r.fecha||'') <= fecha);
+  if(!previos.length){
+    // Si no hay registros previos pero sí posteriores, usamos el primero como aproximación
+    return arr[0].km_real;
+  }
+  return previos[previos.length-1].km_real;
+}
+
 function srvUsedPct(autoId, parteId, srv){
   const last = lastMant(autoId, parteId, srv);
   const ttl = TTL[srv];
-  if(!last || !ttl || !ttl.days) return -1;
-  const days = (Date.now() - new Date(last.fecha).getTime())/86400000;
-  return days/ttl.days;
+  if(!last || !ttl) return -1;
+  // 1) % por tiempo
+  let pctDias = -1;
+  if(ttl.days){
+    const days = (Date.now() - new Date(last.fecha).getTime())/86400000;
+    pctDias = days/ttl.days;
+  }
+  // 2) % por kilometraje (si se está rastreando km y el TTL tiene km>0)
+  let pctKm = -1;
+  if(ttl.km && ttl.km > 0){
+    const kmHoy = kmActual(autoId);
+    if(kmHoy !== null){
+      const kmAlServicio = kmAlDia(autoId, last.fecha);
+      if(kmAlServicio !== null){
+        const kmRodados = Math.max(0, kmHoy - kmAlServicio);
+        pctKm = kmRodados/ttl.km;
+      }
+    }
+  }
+  if(pctDias < 0 && pctKm < 0) return -1;
+  // El que esté más cerca de vencer manda
+  return Math.max(pctDias, pctKm);
 }
 function partHealthState(autoId, parteId){
   const part = PARTES[parteId];
@@ -4075,11 +4240,38 @@ function renderMantPanel(){
       </div>`;
     }).join('');
   }
+  const kmR = kmActual(aId);
+  const kmG = kmGpsActual(aId);
+  const ultK = ultimoRegistroKm(aId);
+  const fmtKm = n => Number(n).toLocaleString('es-MX');
+  const kmCard = `<div style="background:var(--sur2);border-radius:7px;padding:9px 11px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+      <span style="color:var(--tx3);font-size:10px;font-family:var(--mo);letter-spacing:.5px;text-transform:uppercase">Kilometraje</span>
+      ${ultK?`<span style="color:var(--tx3);font-size:10px;font-family:var(--mo)">${ultK.fecha}</span>`:''}
+    </div>
+    ${kmR!==null
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div><span style="color:var(--gr);font-family:var(--mo);font-weight:600;font-size:15px">${fmtKm(kmR)} km</span>
+          <span style="color:var(--tx3);font-size:11px"> real</span>
+          <span style="color:var(--tx3);font-size:11px"> · GPS </span><span style="color:var(--bl);font-family:var(--mo);font-size:12px">${fmtKm(kmG)}</span></div>
+          <div style="display:flex;gap:5px">
+            <button class="btn bp sm" id="mantBtnKmUpd" style="padding:3px 8px;font-size:11px">↗ Actualizar</button>
+            <button class="btn bg sm" id="mantBtnKmHist" style="padding:3px 8px;font-size:11px">📋</button>
+          </div>
+        </div>`
+      : `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div style="color:var(--ye);font-size:12px">⚠ Sin anclaje aún — captura odómetro + GPS</div>
+          <button class="btn bp sm" id="mantBtnKmUpd" style="padding:3px 8px;font-size:11px">⚓ Crear anclaje</button>
+        </div>`}
+  </div>`;
   panel.innerHTML = `
     <div class="ct" style="margin-bottom:8px">${auto.nombre} <span style="color:var(--tx3)">· ${auto.placas||''}</span></div>
+    ${kmCard}
     <div class="mant-cats">${pills}</div>
     ${body}
   `;
+  const bUpd = panel.querySelector('#mantBtnKmUpd'); if(bUpd) bUpd.addEventListener('click',()=>abrirModalKm(aId));
+  const bHis = panel.querySelector('#mantBtnKmHist'); if(bHis) bHis.addEventListener('click',()=>verHistorialKm(aId));
   panel.querySelectorAll('.mant-cat').forEach(el=>{
     el.addEventListener('click',()=>selectPart(el.dataset.part));
   });
@@ -4396,6 +4588,103 @@ if(_psnLast){
 // (que ya se ejecutó arriba). Mientras tanto el app trabaja con localStorage.
 setCloudDot('off','Esperando login con Google…');
 renderDash();
+
+// ═══════════════════════════════════════════════════════════
+// MODAL DE KILOMETRAJE — abrir desde Mis Autos o Mantenimiento
+// ═══════════════════════════════════════════════════════════
+let _kmModalTab = 'gps';
+function abrirModalKm(autoId, modoForzado){
+  const auto = AUTOS.find(a=>a.id===autoId); if(!auto) return;
+  const anc  = ultimoAnclajeKm(autoId);
+  const ult  = ultimoRegistroKm(autoId);
+  document.getElementById('modalKmTit').textContent = `Kilometraje — ${auto.nombre}`;
+  document.getElementById('modalKmCtx').textContent = `${auto.placas||''} · ${auto.color||''}`;
+  document.getElementById('kmAutoId').value = autoId;
+  document.getElementById('kmFecha').value = today();
+  document.getElementById('kmReal').value = '';
+  document.getElementById('kmGps').value = '';
+  document.getElementById('kmNota').value = '';
+  // Si no hay anclaje aún, forzar modo "anclaje"
+  const modo = modoForzado || (anc ? 'gps' : 'anclaje');
+  _kmModalTab = modo;
+  // Pintar tabs
+  document.querySelectorAll('.kmTab').forEach(t=>{
+    t.classList.toggle('on', t.dataset.tab===modo);
+  });
+  document.getElementById('kmRealField').style.display = (modo==='anclaje')?'':'none';
+  document.getElementById('kmGpsLabel').textContent = (modo==='anclaje')?'Kilometraje GPS *':'Nueva lectura GPS *';
+  // Info contextual
+  const info = document.getElementById('kmInfo');
+  if(!anc){
+    info.innerHTML = `<span style="color:var(--ye)">⚠ Aún no hay anclaje para este auto.</span><br>Captura la lectura real del odómetro + la lectura GPS de hoy para crear el primer anclaje. De ahí en adelante podrás actualizar solo el GPS.`;
+  } else {
+    const fmtKm = n => Number(n).toLocaleString('es-MX');
+    info.innerHTML = `<strong style="color:var(--tx)">Último anclaje:</strong> ${anc.fecha} — Real: <span style="color:var(--gr);font-family:var(--mo)">${fmtKm(anc.km_real)} km</span> · GPS: <span style="color:var(--bl);font-family:var(--mo)">${fmtKm(anc.km_gps)} km</span>` +
+      (ult && ult.id!==anc.id ? `<br><strong style="color:var(--tx)">Última lectura:</strong> ${ult.fecha} — Real: <span style="color:var(--gr);font-family:var(--mo)">${fmtKm(ult.km_real)} km</span> · GPS: <span style="color:var(--bl);font-family:var(--mo)">${fmtKm(ult.km_gps)} km</span>` : '') +
+      (modo==='gps' ? `<br><span style="color:var(--tx3);font-size:11px">Solo actualiza el GPS. El km real se calcula automáticamente desde el anclaje.</span>` : `<br><span style="color:var(--tx3);font-size:11px">Crea un nuevo anclaje (resetea baseline). Útil cuando se desconecta o reinicia el GPS.</span>`);
+  }
+  document.getElementById('modalKm').classList.add('on');
+}
+
+document.querySelectorAll('.kmTab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    const tab=t.dataset.tab;
+    abrirModalKm(document.getElementById('kmAutoId').value, tab);
+  });
+});
+
+document.getElementById('btnCancelKm').addEventListener('click', ()=>{
+  document.getElementById('modalKm').classList.remove('on');
+});
+
+document.getElementById('btnOkKm').addEventListener('click', ()=>{
+  const autoId = document.getElementById('kmAutoId').value;
+  const fecha  = document.getElementById('kmFecha').value || today();
+  const kmGps  = Number(document.getElementById('kmGps').value);
+  const nota   = document.getElementById('kmNota').value.trim();
+  if(!Number.isFinite(kmGps) || kmGps<0) return toast('Captura un km GPS válido','er');
+  if(_kmModalTab==='anclaje'){
+    const kmReal = Number(document.getElementById('kmReal').value);
+    if(!Number.isFinite(kmReal) || kmReal<0) return toast('Captura el km real (odómetro)','er');
+    addAnclajeKm(autoId, fecha, kmReal, kmGps, nota);
+    toast(`⚓ Anclaje guardado: ${kmReal.toLocaleString('es-MX')} km`);
+  } else {
+    const r = addGpsUpdateKm(autoId, fecha, kmGps, nota);
+    if(r.error) return toast(r.error,'er');
+    toast(`↗ Km actualizado: ${r.km_real.toLocaleString('es-MX')} km`);
+  }
+  document.getElementById('modalKm').classList.remove('on');
+  // Re-render donde sea visible
+  renderAutos();
+  if(typeof renderMantPanel==='function') renderMantPanel();
+});
+
+function verHistorialKm(autoId){
+  const auto = AUTOS.find(a=>a.id===autoId); if(!auto) return;
+  const arr = kmsDelAuto(autoId);
+  document.getElementById('modalKmHistTit').textContent = `Historial km — ${auto.nombre}`;
+  const body = document.getElementById('kmHistBody');
+  if(arr.length===0){
+    body.innerHTML = `<div class="emp">Sin registros aún</div>`;
+  } else {
+    const fmtKm = n => Number(n).toLocaleString('es-MX');
+    const rows = arr.slice().reverse().map(r=>`
+      <tr>
+        <td class="mo">${r.fecha}</td>
+        <td>${r.esAnclaje?'<span class="b bg2">⚓ Anclaje</span>':'<span class="b bb">↗ GPS</span>'}</td>
+        <td class="ab">${fmtKm(r.km_real)} km</td>
+        <td class="mo" style="color:var(--bl)">${fmtKm(r.km_gps)} km</td>
+        <td style="color:var(--tx2);font-size:12px">${r.nota||'—'}</td>
+        <td><button class="btn bd sm" onclick="if(confirm('¿Eliminar este registro?')){eliminarKmRegistro('${autoId}','${r.id}');verHistorialKm('${autoId}');renderAutos();if(typeof renderMantPanel==='function')renderMantPanel();}">✕</button></td>
+      </tr>`).join('');
+    body.innerHTML = `<div class="tw"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Real</th><th>GPS</th><th>Nota</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  }
+  document.getElementById('modalKmHist').classList.add('on');
+}
+
 // ═══════════════════════════════════════════════════════════
 // EDITAR MOVIMIENTO
 // ═══════════════════════════════════════════════════════════
