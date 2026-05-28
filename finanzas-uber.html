@@ -898,7 +898,12 @@ tr.d3{background:rgba(248,113,113,.04)}
         <select id="mtMov"><option value="">— Crear registro independiente —</option></select>
       </div>
       <div class="fo"><label>Fecha *</label><input type="date" id="mtFecha"></div>
-      <div class="fo"><label>Kilometraje</label><input type="number" id="mtKm" placeholder="65000"></div>
+      <div class="fo"><label>Kilometraje</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="mtKm" placeholder="65000" style="flex:1">
+          <button type="button" class="btn bg sm" id="btnMtKmActual" title="Usar km actual del auto" style="padding:6px 10px;white-space:nowrap">↻ Actual</button>
+        </div>
+      </div>
       <div class="fo"><label>Costo ($)</label><input type="number" id="mtCosto" placeholder="450"></div>
       <div class="fo"><label>Taller / Proveedor</label><select id="mtTaller"><option value="">— Sin taller —</option></select></div>
       <div class="fo full"><label>Nota</label><input type="text" id="mtNota" placeholder="Marca de aceite, observaciones..."></div>
@@ -4320,6 +4325,14 @@ function abrirModalMant(parteId, servicio, ent=null){
   const linked = ent && ent.movId;
   ['mtFecha','mtCosto','mtTaller','mtNota'].forEach(id=>{document.getElementById(id).disabled=linked;});
   document.getElementById('btnDelMant').style.display = ent?'inline-flex':'none';
+  // Botón "↻ Actual" — llena el km con el actual del auto (o 0 si no hay)
+  const btnKmAct = document.getElementById('btnMtKmActual');
+  if(btnKmAct){
+    btnKmAct.onclick = ()=>{
+      const km = kmActual(aId);
+      document.getElementById('mtKm').value = (km!=null) ? km : 0;
+    };
+  }
   document.getElementById('modalMant').classList.add('on');
 }
 function cerrarModalMant(){ document.getElementById('modalMant').classList.remove('on'); }
