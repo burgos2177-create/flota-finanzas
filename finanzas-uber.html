@@ -1218,6 +1218,53 @@ function eliminarKmRegistro(autoId, regId){
 }
 
 // ═══════════════════════════════════════════════════════════
+// BITÁCORA DE KM — segmentos entre lecturas + rentabilidad
+// ═══════════════════════════════════════════════════════════
+// Devuelve los segmentos entre cada par de lecturas consecutivas,
+// con km_delta, días, km/día, ingresos del período, $/km, etc.
+function kmBitacora(autoId){
+  const arr = kmsDelAuto(autoId);
+  const out = [];
+  for(let i=1; i<arr.length; i++){
+    const prev = arr[i-1], curr = arr[i];
+    const kmDelta = Math.max(0, Number(curr.km_real) - Number(prev.km_real));
+    const dDelta = Math.max(0.001, (new Date(curr.fecha) - new Date(prev.fecha))/86400000);
+    const movs = MOVS.filter(m=>m.autoId===autoId && (m.fecha||'')>prev.fecha && (m.fecha||'')<=curr.fecha);
+    const ingreso = movs.filter(m=>Number(m.monto)>0).reduce((s,m)=>s+Number(m.monto),0);
+    const egreso  = -movs.filter(m=>Number(m.monto)<0).reduce((s,m)=>s+Number(m.monto),0);
+    out.push({
+      prev, curr,
+      kmDelta, dias: dDelta,
+      kmPorDia: kmDelta/dDelta,
+      ingreso, egreso, neto: ingreso-egreso,
+      ingresoPorKm: kmDelta>0 ? ingreso/kmDelta : 0,
+      netoPorKm:    kmDelta>0 ? (ingreso-egreso)/kmDelta : 0,
+    });
+  }
+  return out;
+}
+
+// Stats agregadas: total km recorridos, días totales, km/día, $/km globales
+function kmStatsAgregadas(autoId){
+  const arr = kmsDelAuto(autoId);
+  if(arr.length<2) return null;
+  const first = arr[0], last = arr[arr.length-1];
+  const kmTotal = Math.max(0, Number(last.km_real) - Number(first.km_real));
+  const dias = Math.max(0.001, (new Date(last.fecha) - new Date(first.fecha))/86400000);
+  const movs = MOVS.filter(m=>m.autoId===autoId && (m.fecha||'')>=first.fecha && (m.fecha||'')<=last.fecha);
+  const ingreso = movs.filter(m=>Number(m.monto)>0).reduce((s,m)=>s+Number(m.monto),0);
+  const egreso  = -movs.filter(m=>Number(m.monto)<0).reduce((s,m)=>s+Number(m.monto),0);
+  return {
+    kmTotal, dias,
+    kmPorDia: kmTotal/dias,
+    ingreso, egreso, neto: ingreso-egreso,
+    ingresoPorKm: kmTotal>0 ? ingreso/kmTotal : 0,
+    netoPorKm: kmTotal>0 ? (ingreso-egreso)/kmTotal : 0,
+    fechaIni: first.fecha, fechaFin: last.fecha
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
 // CLOUD SYNC — Firestore en fnz-psnal (auth-gated)
 // Migrado desde Realtime Database (database-flotilla) que fue
 // suspendido por Google por config + reglas públicas en repo
@@ -1918,6 +1965,7 @@ function renderAutos(){
     const kmReal = kmActual(a.id);
     const kmGps  = kmGpsActual(a.id);
     const ultKm  = ultimoRegistroKm(a.id);
+    const aggKm  = kmStatsAgregadas(a.id);
     const fmtKm  = n => Number(n).toLocaleString('es-MX');
     div.innerHTML=`
       <div class="fb m4">
@@ -1936,6 +1984,10 @@ function renderAutos(){
         ${kmReal!==null
           ? `<div style="display:flex;justify-content:space-between;gap:6px"><div><span style="color:var(--gr);font-family:var(--mo);font-weight:600;font-size:14px">${fmtKm(kmReal)} km</span><span style="color:var(--tx3);font-size:11px"> real</span></div><div><span style="color:var(--bl);font-family:var(--mo);font-size:12px">${fmtKm(kmGps)}</span><span style="color:var(--tx3);font-size:11px"> gps</span></div></div>`
           : `<div style="color:var(--ye);font-size:12px">⚠ Sin anclaje aún</div>`}
+        ${aggKm?`<div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;font-family:var(--mo)">
+          <span style="color:var(--tx3)">📈 <span style="color:var(--bl)">${aggKm.kmPorDia.toFixed(1)} km/día</span></span>
+          <span style="color:var(--tx3)">💰 <span style="color:${aggKm.netoPorKm>=0?'var(--gr)':'var(--re)'}">${fmt(aggKm.netoPorKm)}/km</span></span>
+        </div>`:''}
         <div style="display:flex;gap:5px;margin-top:7px">
           <button class="btn bp sm btnKmUpdate" style="flex:1;padding:3px 8px;font-size:11px">${kmReal!==null?'↗ Actualizar km':'⚓ Crear anclaje'}</button>
           ${kmReal!==null?'<button class="btn bg sm btnKmHist" style="padding:3px 8px;font-size:11px">📋</button>':''}
@@ -4425,6 +4477,7 @@ function renderMantPanel(){
   const kmR = kmActual(aId);
   const kmG = kmGpsActual(aId);
   const ultK = ultimoRegistroKm(aId);
+  const aggK = kmStatsAgregadas(aId);
   const fmtKm = n => Number(n).toLocaleString('es-MX');
   const kmCard = `<div style="background:var(--sur2);border-radius:7px;padding:9px 11px;margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -4440,7 +4493,11 @@ function renderMantPanel(){
             <button class="btn bp sm" id="mantBtnKmUpd" style="padding:3px 8px;font-size:11px">↗ Actualizar</button>
             <button class="btn bg sm" id="mantBtnKmHist" style="padding:3px 8px;font-size:11px">📋</button>
           </div>
-        </div>`
+        </div>
+        ${aggK?`<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;font-family:var(--mo);padding-top:6px;border-top:1px solid var(--bor)">
+          <span style="color:var(--tx3)">📈 <span style="color:var(--bl)">${aggK.kmPorDia.toFixed(1)} km/día</span></span>
+          <span style="color:var(--tx3)">💰 Neto: <span style="color:${aggK.netoPorKm>=0?'var(--gr)':'var(--re)'}">${fmt(aggK.netoPorKm)}/km</span></span>
+        </div>`:''}`
       : `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div style="color:var(--ye);font-size:12px">⚠ Sin anclaje aún — captura odómetro + GPS</div>
           <button class="btn bp sm" id="mantBtnKmUpd" style="padding:3px 8px;font-size:11px">⚓ Crear anclaje</button>
@@ -5218,24 +5275,73 @@ function verHistorialKm(autoId){
   const arr = kmsDelAuto(autoId);
   document.getElementById('modalKmHistTit').textContent = `Historial km — ${auto.nombre}`;
   const body = document.getElementById('kmHistBody');
+  const fmtKm = n => Number(n).toLocaleString('es-MX', {maximumFractionDigits:0});
   if(arr.length===0){
     body.innerHTML = `<div class="emp">Sin registros aún</div>`;
+    document.getElementById('modalKmHist').classList.add('on');
+    return;
+  }
+  // 1) Card de stats agregadas
+  const agg = kmStatsAgregadas(autoId);
+  let aggCard = '';
+  if(agg){
+    const colorNetoKm = agg.netoPorKm>=0 ? 'var(--gr)' : 'var(--re)';
+    aggCard = `<div style="background:var(--sur2);border-radius:8px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:10px;color:var(--tx3);font-family:var(--mo);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">📊 Resumen — ${fdate(agg.fechaIni)} a ${fdate(agg.fechaFin)}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px">
+        <div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo)">Km recorridos</div><div style="font-family:var(--mo);font-weight:600;font-size:15px;color:var(--tx)">${fmtKm(agg.kmTotal)} km</div></div>
+        <div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo)">Días</div><div style="font-family:var(--mo);font-weight:600;font-size:15px;color:var(--tx)">${agg.dias.toFixed(0)}</div></div>
+        <div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo)">Km / día</div><div style="font-family:var(--mo);font-weight:600;font-size:15px;color:var(--bl)">${agg.kmPorDia.toFixed(1)}</div></div>
+        <div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo)">Ingreso / km</div><div style="font-family:var(--mo);font-weight:600;font-size:15px;color:var(--gr)">${fmt(agg.ingresoPorKm)}</div></div>
+        <div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo)">Neto / km</div><div style="font-family:var(--mo);font-weight:600;font-size:15px;color:${colorNetoKm}">${fmt(agg.netoPorKm)}</div></div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bor);display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;font-size:11px">
+        <div><span style="color:var(--tx3)">Ingreso total: </span><span class="ap mo">${fmt(agg.ingreso)}</span></div>
+        <div><span style="color:var(--tx3)">Egreso total: </span><span class="an mo">${fmt(agg.egreso)}</span></div>
+        <div><span style="color:var(--tx3)">Neto: </span><span class="mo" style="color:${agg.neto>=0?'var(--gr)':'var(--re)'};font-weight:600">${fmt(agg.neto)}</span></div>
+      </div>
+    </div>`;
   } else {
-    const fmtKm = n => Number(n).toLocaleString('es-MX');
-    const rows = arr.slice().reverse().map(r=>`
-      <tr>
-        <td class="mo">${r.fecha}</td>
-        <td>${r.esAnclaje?'<span class="b bg2">⚓ Anclaje</span>':'<span class="b bb">↗ GPS</span>'}</td>
-        <td class="ab">${fmtKm(r.km_real)} km</td>
-        <td class="mo" style="color:var(--bl)">${fmtKm(r.km_gps)} km</td>
-        <td style="color:var(--tx2);font-size:12px">${r.nota||'—'}</td>
-        <td><button class="btn bd sm" onclick="if(confirm('¿Eliminar este registro?')){eliminarKmRegistro('${autoId}','${r.id}');verHistorialKm('${autoId}');renderAutos();if(typeof renderMantPanel==='function')renderMantPanel();}">✕</button></td>
-      </tr>`).join('');
-    body.innerHTML = `<div class="tw"><table>
+    aggCard = `<div style="background:var(--sur2);border-radius:8px;padding:12px 14px;margin-bottom:14px;color:var(--tx3);font-size:12px">Necesitas al menos 2 lecturas para calcular promedios y rentabilidad.</div>`;
+  }
+  // 2) Bitácora de segmentos (cada par de lecturas consecutivas)
+  const segs = kmBitacora(autoId);
+  let segsTable = '';
+  if(segs.length>0){
+    const segRows = segs.slice().reverse().map(s=>{
+      const colorNet = s.netoPorKm>=0?'var(--gr)':'var(--re)';
+      return `<tr>
+        <td class="mo">${s.curr.fecha}</td>
+        <td class="mo">${s.kmDelta.toLocaleString('es-MX',{maximumFractionDigits:0})}</td>
+        <td class="mo">${s.dias.toFixed(0)}d</td>
+        <td class="mo" style="color:var(--bl)">${s.kmPorDia.toFixed(1)}</td>
+        <td class="mo ap">${fmt(s.ingreso)}</td>
+        <td class="mo an">${fmt(s.egreso)}</td>
+        <td class="mo" style="color:${colorNet};font-weight:600">${fmt(s.netoPorKm)}</td>
+      </tr>`;
+    }).join('');
+    segsTable = `<div style="font-size:10px;color:var(--tx3);font-family:var(--mo);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">📈 Rentabilidad por período entre lecturas</div>
+      <div class="tw" style="margin-bottom:18px"><table>
+        <thead><tr><th>Hasta</th><th>Δ km</th><th>Días</th><th>km/día</th><th>Ingreso</th><th>Egreso</th><th>Neto/km</th></tr></thead>
+        <tbody>${segRows}</tbody>
+      </table></div>`;
+  }
+  // 3) Lecturas individuales (lista cruda)
+  const rows = arr.slice().reverse().map(r=>`
+    <tr>
+      <td class="mo">${r.fecha}</td>
+      <td>${r.esAnclaje?'<span class="b bg2">⚓ Anclaje</span>':'<span class="b bb">↗ GPS</span>'}</td>
+      <td class="ab">${fmtKm(r.km_real)} km</td>
+      <td class="mo" style="color:var(--bl)">${fmtKm(r.km_gps)} km</td>
+      <td style="color:var(--tx2);font-size:12px">${r.nota||'—'}</td>
+      <td><button class="btn bd sm" onclick="if(confirm('¿Eliminar este registro?')){eliminarKmRegistro('${autoId}','${r.id}');verHistorialKm('${autoId}');renderAutos();if(typeof renderMantPanel==='function')renderMantPanel();}">✕</button></td>
+    </tr>`).join('');
+  body.innerHTML = `${aggCard}${segsTable}
+    <div style="font-size:10px;color:var(--tx3);font-family:var(--mo);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px">📋 Lecturas individuales</div>
+    <div class="tw"><table>
       <thead><tr><th>Fecha</th><th>Tipo</th><th>Real</th><th>GPS</th><th>Nota</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
-  }
   document.getElementById('modalKmHist').classList.add('on');
 }
 
