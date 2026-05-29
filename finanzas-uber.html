@@ -636,7 +636,7 @@ tr.d3{background:rgba(248,113,113,.04)}
 
   <div class="card">
     <div class="ct">💳 Deuda de tarjeta de crédito</div>
-    <div class="chart-wrap" style="height:130px">
+    <div class="chart-wrap">
       <canvas id="deudaChart"></canvas>
     </div>
     <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--tx3);flex-wrap:wrap">
@@ -3710,7 +3710,7 @@ function drawSaldoChart(){
     ctx.fillText('Sin movimientos registrados',W/2,H/2);
     document.getElementById('saldoStats').innerHTML='';
     const dC=document.getElementById('deudaChart');
-    if(dC){ const dctx=dC.getContext('2d'); dC.width=W*dpr; dC.height=120*dpr; dC.style.width=W+'px'; dC.style.height='120px'; dctx.clearRect(0,0,W,120); }
+    if(dC){ const dctx=dC.getContext('2d'); dC.width=W*dpr; dC.height=130*dpr; dC.style.width=W+'px'; dC.style.height='130px'; dctx.clearRect(0,0,W,130); }
     return;
   }
   // Eje Y considera tanto bruto como neto
@@ -3795,27 +3795,33 @@ function drawDeudaChart(points){
   const container=canvas.parentElement;
   const dpr=window.devicePixelRatio||1;
   const W=container.clientWidth||800;
-  const H=120;
+  const H=130;
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,W,H);
   if(!points || !points.length) return;
-  const pad={top:14,right:20,bottom:22,left:76};
+  const pad={top:14,right:80,bottom:22,left:76};
   const cW=W-pad.left-pad.right, cH=H-pad.top-pad.bottom;
   const vals=points.map(p=>Math.max(0,p.deuda));
-  let minV=0, maxV=Math.max(...vals, TARJETA.limite||10000);
-  const range=maxV-minV||1;
+  const limite = TARJETA.limite||10000;
+  // El máximo del eje siempre es el límite (deja headroom si la deuda lo supera)
+  const maxData = Math.max(...vals);
+  let maxV = Math.max(limite, maxData * 1.05);
+  const range = maxV || 1;
   const n=points.length;
   const toX=i=>pad.left+(i/(n-1||1))*cW;
-  const toY=v=>pad.top+cH-((v-minV)/range)*cH;
-  // Línea horizontal del límite
-  const yLim=toY(TARJETA.limite||10000);
+  const toY=v=>pad.top+cH-(v/range)*cH;
+  // Línea horizontal del límite (solo dentro del área de la gráfica)
+  const yLim=toY(limite);
   ctx.strokeStyle='rgba(248,113,113,0.55)';ctx.setLineDash([5,4]);ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(pad.left,yLim);ctx.lineTo(pad.left+cW,yLim);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='rgba(248,113,113,0.7)';ctx.font='9px "DM Mono",monospace';ctx.textAlign='right';
-  ctx.fillText('Límite '+(TARJETA.limite||10000).toLocaleString('es-MX'), pad.left-4, yLim+3);
+  // Label del límite a la DERECHA, fuera del área del eje Y para no traslaparse
+  ctx.fillStyle='rgba(248,113,113,0.85)';
+  ctx.font='9px "DM Mono",monospace';
+  ctx.textAlign='left';
+  ctx.fillText('Límite '+limite.toLocaleString('es-MX'), pad.left+cW+5, yLim+3);
   // Gradient + line
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
   grad.addColorStop(0,'rgba(251,146,60,0.30)');grad.addColorStop(1,'rgba(0,0,0,0)');
@@ -3826,10 +3832,17 @@ function drawDeudaChart(points){
   ctx.beginPath();
   points.forEach((p,i)=>{const x=toX(i),y=toY(Math.max(0,p.deuda));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
   ctx.strokeStyle='#fb923c';ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
-  // Labels Y (solo min/max)
+  // Punto y label del valor actual (al final de la línea)
+  const lastVal = Math.max(0, points[points.length-1].deuda);
+  const lastX = toX(n-1), lastY = toY(lastVal);
+  ctx.fillStyle='#fb923c';
+  ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fb923c'; ctx.font='10px "DM Mono",monospace'; ctx.textAlign='left';
+  ctx.fillText(fmt(lastVal), lastX+6, lastY+3);
+  // Labels Y (solo max y 0) — alineados a la derecha del padding izq
   ctx.fillStyle='rgba(139,144,160,0.85)';ctx.font='10px "DM Mono",monospace';ctx.textAlign='right';
-  ctx.fillText(maxV.toLocaleString('es-MX',{maximumFractionDigits:0}), pad.left-5, pad.top+4);
-  ctx.fillText('0', pad.left-5, pad.top+cH+3);
+  ctx.fillText(maxV.toLocaleString('es-MX',{maximumFractionDigits:0}), pad.left-5, pad.top+8);
+  ctx.fillText('0', pad.left-5, pad.top+cH+4);
 }
 
 function initSaldoTooltip(){
