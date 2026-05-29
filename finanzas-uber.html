@@ -267,6 +267,8 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="ns">Análisis</div>
   <div class="ni" data-pg="analisis">◆ &nbsp;Análisis</div>
   <div class="ni" data-pg="saldo">📈 &nbsp;Saldo Flota</div>
+  <div class="ns">Crédito</div>
+  <div class="ni" data-pg="tarjeta">💳 &nbsp;Tarjeta de crédito</div>
   <div class="ns">Sistema</div>
   <div class="ni" id="btnExport">↓ &nbsp;Exportar datos</div>
   <div class="ni" id="btnImport">↑ &nbsp;Importar datos</div>
@@ -614,6 +616,82 @@ tr.d3{background:rgba(248,113,113,.04)}
   </div>
 </div>
 
+<!-- TARJETA DE CRÉDITO -->
+<div id="pg-tarjeta" class="pg">
+  <div class="fb m16">
+    <div>
+      <div class="pt">💳 Tarjeta de crédito</div>
+      <div class="ps" id="tcSubtitle">Línea de crédito y compras</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn bp" id="btnTcCompra">＋ Compra</button>
+      <button class="btn bg" id="btnTcPago">＋ Pago</button>
+      <button class="btn bg" id="btnTcConfig">⚙</button>
+    </div>
+  </div>
+
+  <!-- Línea de crédito visual -->
+  <div class="card">
+    <div class="fb m16">
+      <div class="ct">Línea de crédito</div>
+      <div id="tcCorteInfo" style="font-size:11px;color:var(--tx3);font-family:var(--mo)"></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <div><span id="tcUsado" style="font-family:var(--mo);font-size:24px;font-weight:600;color:var(--tx)">$0</span><span style="color:var(--tx3);font-size:13px"> de <span id="tcLimite">$10,000</span></span></div>
+        <div id="tcUsoPct" style="font-family:var(--mo);font-size:18px;font-weight:600;color:var(--gr)">0%</div>
+      </div>
+      <div style="background:var(--sur2);border-radius:10px;height:14px;overflow:hidden">
+        <div id="tcBar" style="height:100%;background:linear-gradient(90deg,#4ade80,#fbbf24,#ef4444);width:0%;transition:width .3s ease;border-radius:10px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--tx3);font-family:var(--mo)">
+        <span>Disponible: <strong id="tcDisp" style="color:var(--gr)">$10,000</strong></span>
+        <span>Mensualidad MSI total: <strong id="tcMsiTotal" style="color:var(--bl)">$0</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sr">
+    <div class="sc"><div class="sl">Deuda total</div><div class="sv" id="tcStatDeuda">$0</div></div>
+    <div class="sc"><div class="sl">Próximo corte</div><div class="sv" id="tcStatCorte" style="font-size:14px">—</div></div>
+    <div class="sc"><div class="sl">Estimado al corte</div><div class="sv" id="tcStatCortMonto">$0</div></div>
+    <div class="sc"><div class="sl">Compras activas</div><div class="sv" id="tcStatNumCompras">0</div></div>
+  </div>
+
+  <!-- MSI activos -->
+  <div class="card">
+    <div class="ct">MSI activos</div>
+    <div id="tcMsiList"><div class="emp">Sin compras a meses activas.</div></div>
+  </div>
+
+  <!-- Próximos cortes -->
+  <div class="card">
+    <div class="ct">Próximos 6 cortes</div>
+    <div class="tw"><table>
+      <thead><tr><th>Fecha de corte</th><th>Mensualidades MSI</th><th>Cargos no-MSI</th><th>Total estimado</th></tr></thead>
+      <tbody id="tcCortesBody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- Movimientos -->
+  <div class="card">
+    <div class="fb m16">
+      <div class="ct">Movimientos (compras y pagos)</div>
+      <div style="display:flex;gap:6px">
+        <select id="tcFiltroTipo" style="font-size:12px;padding:5px 10px">
+          <option value="">Todos</option>
+          <option value="c">Solo compras</option>
+          <option value="p">Solo pagos</option>
+        </select>
+      </div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Auto</th><th>MSI</th><th>Monto</th><th></th></tr></thead>
+      <tbody id="tcMovsBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
 <!-- ANÁLISIS -->
 <div id="pg-analisis" class="pg">
   <div class="pt">Análisis</div>
@@ -777,6 +855,93 @@ tr.d3{background:rgba(248,113,113,.04)}
 </div>
 
 <div id="toast"></div>
+
+<!-- MODAL TARJETA — COMPRA -->
+<div class="mb" id="modalTcCompra">
+  <div class="md" style="max-width:580px">
+    <div class="mt" id="modalTcCompraTit">Nueva compra con tarjeta</div>
+    <div class="fg">
+      <div class="fo"><label>Fecha *</label><input type="date" id="tcCompFecha"></div>
+      <div class="fo"><label>Monto total ($) *</label><input type="number" id="tcCompMonto" placeholder="1200" step="0.01"></div>
+      <div class="fo full"><label>Concepto *</label><input type="text" id="tcCompConcepto" placeholder="Ej: Terminales RF X2"></div>
+      <div class="fo"><label>Meses sin intereses</label>
+        <select id="tcCompMsi">
+          <option value="1">De contado (1 pago)</option>
+          <option value="3">3 MSI</option>
+          <option value="6">6 MSI</option>
+          <option value="9">9 MSI</option>
+          <option value="12">12 MSI</option>
+          <option value="18">18 MSI</option>
+          <option value="24">24 MSI</option>
+        </select>
+      </div>
+      <div class="fo"><label>Categoría</label>
+        <select id="tcCompCat">
+          <option value="Reparaciones">Reparaciones</option>
+          <option value="Reinversión">Reinversión</option>
+          <option value="GPS">GPS</option>
+          <option value="Seguro">Seguro</option>
+          <option value="Administración">Administración</option>
+          <option value="Combustible">Combustible</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </div>
+      <div class="fo"><label>Auto asociado (opcional)</label>
+        <select id="tcCompAuto"><option value="">— Ninguno (gasto general) —</option></select>
+      </div>
+      <div class="fo"><label>Taller / Proveedor (opcional)</label>
+        <select id="tcCompTaller"><option value="">— Ninguno —</option></select>
+      </div>
+      <div class="fo full"><label>Nota</label><input type="text" id="tcCompNota" placeholder="Detalles, marca, etc."></div>
+    </div>
+    <div id="tcCompPreview" style="background:var(--sur2);border-radius:7px;padding:10px 13px;margin-top:10px;font-size:12px;color:var(--tx2);line-height:1.8"></div>
+    <input type="hidden" id="tcCompId">
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px">
+      <button class="btn bd" id="btnTcCompDel" style="display:none">Eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn bg" id="btnTcCompCancel">Cancelar</button>
+        <button class="btn bp" id="btnTcCompOk">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TARJETA — PAGO -->
+<div class="mb" id="modalTcPago">
+  <div class="md" style="max-width:480px">
+    <div class="mt">Registrar pago a tarjeta</div>
+    <div class="fg">
+      <div class="fo"><label>Fecha *</label><input type="date" id="tcPagFecha"></div>
+      <div class="fo"><label>Monto ($) *</label><input type="number" id="tcPagMonto" placeholder="1200" step="0.01"></div>
+      <div class="fo full"><label>Nota</label><input type="text" id="tcPagNota" placeholder="Pago de corte mayo, etc."></div>
+    </div>
+    <input type="hidden" id="tcPagId">
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:14px">
+      <button class="btn bd" id="btnTcPagDel" style="display:none">Eliminar</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn bg" id="btnTcPagCancel">Cancelar</button>
+        <button class="btn bp" id="btnTcPagOk">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TARJETA — CONFIG -->
+<div class="mb" id="modalTcConfig">
+  <div class="md" style="max-width:420px">
+    <div class="mt">Configuración de la tarjeta</div>
+    <div class="fg">
+      <div class="fo full"><label>Límite de crédito ($)</label><input type="number" id="tcCfgLimite" placeholder="10000"></div>
+      <div class="fo"><label>Día de corte (1-31)</label><input type="number" id="tcCfgCorte" placeholder="15" min="1" max="31"></div>
+      <div class="fo"><label>Día de pago (1-31)</label><input type="number" id="tcCfgPago" placeholder="5" min="1" max="31"></div>
+      <div class="fo full"><label>Apodo / Nombre</label><input type="text" id="tcCfgNombre" placeholder="Ej: BBVA Azul"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn bg" id="btnTcCfgCancel">Cancelar</button>
+      <button class="btn bp" id="btnTcCfgOk">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL KILOMETRAJE -->
 <div class="mb" id="modalKm">
@@ -956,6 +1121,13 @@ let DOCS       = S.get('ff_docs',[]);
 let TALLERES   = S.get('ff_talleres',[]);
 let MANTENIMIENTO = S.get('ff_mant',{});
 let KMS        = S.get('ff_kms',{}); // {autoId: [{id,fecha,km_gps,km_real,esAnclaje,nota}, ...]}
+let TARJETA    = S.get('ff_tarjeta', {
+  nombre: 'Tarjeta de crédito',
+  limite: 10000,
+  diaCorte: 15,
+  diaPago: 5,
+  movs: [] // {id, tipo:'c'|'p', fecha, monto, msi, concepto, autoId, categoria, tallerId, nota, _ts}
+});
 
 function save(){
   S.set('ff_autos',AUTOS);S.set('ff_movs',MOVS);
@@ -966,6 +1138,7 @@ function save(){
   S.set('ff_talleres',TALLERES);
   S.set('ff_mant',MANTENIMIENTO);
   S.set('ff_kms',KMS);
+  S.set('ff_tarjeta',TARJETA);
   // Marcar timestamp local inmediatamente para proteger cambios antes del sync
   S.set('ff_local_ts',Date.now());
   syncToCloud();
@@ -1079,6 +1252,7 @@ function _applyCloudData(d){
   if(d.TALLERES){TALLERES=d.TALLERES;S.set('ff_talleres',TALLERES);}
   if(d.MANTENIMIENTO){MANTENIMIENTO=d.MANTENIMIENTO;S.set('ff_mant',MANTENIMIENTO);}
   if(d.KMS){KMS=d.KMS;S.set('ff_kms',KMS);}
+  if(d.TARJETA){TARJETA=d.TARJETA;S.set('ff_tarjeta',TARJETA);}
 }
 
 function _markSynced(){
@@ -1128,6 +1302,7 @@ function renderCurrentPage(){
   else if(id==='talleres')renderTalleres();
   else if(id==='saldo')renderSaldo();
   else if(id==='mantenimiento')renderMantPanel();
+  else if(id==='tarjeta')renderTarjeta();
 }
 
 async function loadFromCloud(){
@@ -1160,7 +1335,7 @@ function syncToCloud(force=false){
     setCloudDot('syncing');
     try{
       const ts=Date.now();
-      await ref.set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,_ts:ts});
+      await ref.set({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,TARJETA,_ts:ts});
       S.set('ff_local_ts',ts);
       _markSynced();
     }catch(e){
@@ -1307,6 +1482,7 @@ function goTo(pg){
   if(pg==='analisis')renderAnalisis();
   if(pg==='saldo')renderSaldo();
   if(pg==='mantenimiento')renderMant();
+  if(pg==='tarjeta')renderTarjeta();
 }
 
 document.querySelectorAll('.ni[data-pg]').forEach(el=>{
@@ -2824,7 +3000,7 @@ function renderDocsChofer(choferId){
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════
 document.getElementById('btnExport').addEventListener('click',()=>{
-  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,exportado:new Date().toISOString()},null,2);
+  const data=JSON.stringify({AUTOS,MOVS,CHOFERES,PERIODOS,INACTIVIDAD,CONTRATOS,DOCS,TALLERES,MANTENIMIENTO,KMS,TARJETA,exportado:new Date().toISOString()},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download=`flota-finanzas-${today()}.json`;a.click();
@@ -2845,8 +3021,9 @@ document.getElementById('importFile').addEventListener('change',function(){
       const CT=d.CONTRATOS||[];const DC=d.DOCS||[];const TL=d.TALLERES||[];
       const MT=d.MANTENIMIENTO||{};
       const KM=d.KMS||{};
+      const TJ=d.TARJETA||TARJETA;
       if(!await confirmar(`Importar ${A.length} autos, ${M.length} movimientos y ${C.length} choferes?`,'Importar','bp'))return;
-      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;MANTENIMIENTO=MT;KMS=KM;
+      AUTOS=A;MOVS=M;CHOFERES=C;PERIODOS=P;INACTIVIDAD=I;CONTRATOS=CT;DOCS=DC;TALLERES=TL;MANTENIMIENTO=MT;KMS=KM;TARJETA=TJ;
       save();renderDash();toast('✓ Datos importados');
     }catch{toast('Archivo no válido','er');}
   };
@@ -4601,6 +4778,370 @@ if(_psnLast){
 // (que ya se ejecutó arriba). Mientras tanto el app trabaja con localStorage.
 setCloudDot('off','Esperando login con Google…');
 renderDash();
+
+// ═══════════════════════════════════════════════════════════
+// TARJETA DE CRÉDITO — módulo completo
+// ═══════════════════════════════════════════════════════════
+function tcCompras(){ return TARJETA.movs.filter(m=>m.tipo==='c'); }
+function tcPagos(){ return TARJETA.movs.filter(m=>m.tipo==='p'); }
+function tcDeudaTotal(){
+  return tcCompras().reduce((s,m)=>s+Number(m.monto||0),0) -
+         tcPagos().reduce((s,m)=>s+Number(m.monto||0),0);
+}
+function tcUsoPct(){ return TARJETA.limite>0 ? Math.min(100,(tcDeudaTotal()/TARJETA.limite)*100) : 0; }
+function tcDisponible(){ return Math.max(0, TARJETA.limite - tcDeudaTotal()); }
+
+// Suma la mensualidad mensual de TODAS las MSI activas (compras donde quedan mensualidades por cobrar)
+function tcMsiMensualidadTotal(){
+  let total = 0;
+  tcCompras().forEach(c=>{
+    if(!c.msi || c.msi<=1) return;
+    const left = tcMsiRestantes(c);
+    if(left>0) total += Number(c.monto)/Number(c.msi);
+  });
+  return total;
+}
+
+// Cuántas mensualidades quedan por cobrar para una compra
+function tcMsiRestantes(c){
+  if(!c.msi || c.msi<=1) return 0;
+  const cobradas = tcMsiCobradas(c);
+  return Math.max(0, Number(c.msi) - cobradas);
+}
+
+// Cuántas mensualidades ya pasaron por algún corte (desde la compra hasta hoy)
+function tcMsiCobradas(c){
+  if(!c.msi || c.msi<=1) return 1;
+  const sched = tcMsiSchedule(c);
+  const hoy = today();
+  return sched.filter(s=>s.fechaCorte <= hoy).length;
+}
+
+// Para una compra, devuelve el calendario de mensualidades [{n, mensualidad, fechaCorte}]
+function tcMsiSchedule(c){
+  const dc = TARJETA.diaCorte || 15;
+  const monto = Number(c.monto);
+  const msi = Math.max(1, Number(c.msi)||1);
+  const mensualidad = +(monto/msi).toFixed(2);
+  // El primer corte es el siguiente día de corte después (o igual) a la fecha de compra
+  const [y,m,d] = c.fecha.split('-').map(Number);
+  // Si la compra fue ANTES o EL día de corte, la primera mensualidad cae en este mismo corte.
+  // Si fue DESPUÉS, cae en el corte del mes siguiente.
+  let cY=y, cM=m;
+  if(d > dc){ cM = m+1; if(cM>12){cM=1; cY=y+1;} }
+  const out = [];
+  for(let i=0; i<msi; i++){
+    out.push({
+      n: i+1,
+      mensualidad,
+      fechaCorte: _isoFecha(cY, cM, dc)
+    });
+    cM++; if(cM>12){cM=1; cY++;}
+  }
+  return out;
+}
+
+function _isoFecha(y,m,d){
+  // Maneja casos donde el día de corte no existe en el mes (ej. 31 de feb → último día del mes)
+  const last = new Date(y, m, 0).getDate();
+  const day = Math.min(d, last);
+  return `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+// Próximo corte calculado desde hoy (siguiente día diaCorte >= hoy)
+function tcProximoCorte(){
+  const t = new Date();
+  const y=t.getFullYear(), m=t.getMonth()+1, d=t.getDate();
+  const dc = TARJETA.diaCorte || 15;
+  if(d <= dc) return _isoFecha(y, m, dc);
+  let nm = m+1, ny=y;
+  if(nm>12){ nm=1; ny=y+1; }
+  return _isoFecha(ny, nm, dc);
+}
+
+// Lista de N próximos cortes ISO
+function tcCortesProximos(n=6){
+  let cur = tcProximoCorte();
+  const out = [cur];
+  while(out.length<n){
+    const [y,m] = cur.split('-').map(Number);
+    let nm=m+1, ny=y;
+    if(nm>12){nm=1; ny=y+1;}
+    cur = _isoFecha(ny, nm, TARJETA.diaCorte||15);
+    out.push(cur);
+  }
+  return out;
+}
+
+// Para un corte ISO, suma: (mensualidades MSI activas que caen en ese corte) + (cargos no-MSI que se cargan en ese corte)
+function tcResumenCorte(corteISO){
+  let msi=0, noMsi=0;
+  tcCompras().forEach(c=>{
+    if(c.msi && c.msi>1){
+      const sched = tcMsiSchedule(c);
+      sched.forEach(s=>{ if(s.fechaCorte===corteISO) msi += s.mensualidad; });
+    } else {
+      // No-MSI: cae en el corte siguiente a su fecha
+      const sched = tcMsiSchedule({...c, msi:1});
+      if(sched[0] && sched[0].fechaCorte===corteISO) noMsi += Number(c.monto);
+    }
+  });
+  return {msi, noMsi, total: msi+noMsi};
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER TARJETA
+// ═══════════════════════════════════════════════════════════
+function renderTarjeta(){
+  document.getElementById('tcSubtitle').textContent = TARJETA.nombre || 'Tarjeta de crédito';
+  const deuda = tcDeudaTotal();
+  const pct = tcUsoPct();
+  const disp = tcDisponible();
+  const msiTot = tcMsiMensualidadTotal();
+  document.getElementById('tcUsado').textContent = fmt(deuda);
+  document.getElementById('tcLimite').textContent = fmt(TARJETA.limite);
+  document.getElementById('tcUsoPct').textContent = pct.toFixed(1)+'%';
+  document.getElementById('tcUsoPct').style.color = pct>=85?'var(--re)':pct>=60?'var(--ye)':'var(--gr)';
+  document.getElementById('tcBar').style.width = pct+'%';
+  document.getElementById('tcDisp').textContent = fmt(disp);
+  document.getElementById('tcMsiTotal').textContent = fmt(msiTot);
+  document.getElementById('tcCorteInfo').textContent = `Corte día ${TARJETA.diaCorte||'?'} · Pago día ${TARJETA.diaPago||'?'}`;
+  // Stats
+  document.getElementById('tcStatDeuda').textContent = fmt(deuda);
+  const prox = tcProximoCorte();
+  document.getElementById('tcStatCorte').textContent = fdate(prox);
+  const rsm = tcResumenCorte(prox);
+  document.getElementById('tcStatCortMonto').textContent = fmt(rsm.total);
+  document.getElementById('tcStatNumCompras').textContent = tcCompras().length;
+  // MSI activos
+  const msiActivos = tcCompras().filter(c=>c.msi>1 && tcMsiRestantes(c)>0)
+                                 .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const msiList = document.getElementById('tcMsiList');
+  if(!msiActivos.length){
+    msiList.innerHTML = '<div class="emp">Sin compras a meses activas.</div>';
+  } else {
+    msiList.innerHTML = msiActivos.map(c=>{
+      const auto = c.autoId?getAuto(c.autoId):null;
+      const restantes = tcMsiRestantes(c);
+      const cobradas = tcMsiCobradas(c);
+      const mensual = Number(c.monto)/Number(c.msi);
+      const progPct = (cobradas/c.msi)*100;
+      const sched = tcMsiSchedule(c);
+      const next = sched.find(s=>s.fechaCorte>today());
+      return `<div style="border:1px solid var(--bor);border-radius:8px;padding:12px 14px;margin-bottom:10px">
+        <div class="fb m4">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--tx)">${c.concepto}</div>
+            <div style="font-size:11px;color:var(--tx3)">${fdate(c.fecha)} · ${fmt(c.monto)} · ${c.msi} MSI ${auto?' · '+auto.nombre:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--mo);font-size:15px;font-weight:600;color:var(--bl)">${fmt(mensual)}/mes</div>
+            <div style="font-size:11px;color:var(--tx3)">Restan ${restantes}/${c.msi}</div>
+          </div>
+        </div>
+        <div style="background:var(--sur2);border-radius:6px;height:6px;overflow:hidden;margin-top:8px">
+          <div style="height:100%;width:${progPct}%;background:var(--bl)"></div>
+        </div>
+        ${next?`<div style="font-size:11px;color:var(--tx3);font-family:var(--mo);margin-top:6px">Próximo cobro: ${fdate(next.fechaCorte)}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+  // Próximos cortes
+  const cortes = tcCortesProximos(6);
+  document.getElementById('tcCortesBody').innerHTML = cortes.map(cf=>{
+    const r = tcResumenCorte(cf);
+    return `<tr>
+      <td class="mo">${fdate(cf)}</td>
+      <td class="mo" style="color:var(--bl)">${fmt(r.msi)}</td>
+      <td class="mo" style="color:var(--tx2)">${fmt(r.noMsi)}</td>
+      <td class="ab">${fmt(r.total)}</td>
+    </tr>`;
+  }).join('');
+  // Movimientos
+  const filtro = document.getElementById('tcFiltroTipo').value;
+  let movs = [...TARJETA.movs].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b._ts||0)-(a._ts||0));
+  if(filtro) movs = movs.filter(m=>m.tipo===filtro);
+  const body = document.getElementById('tcMovsBody');
+  if(!movs.length){
+    body.innerHTML = '<tr><td colspan="7" class="emp">Sin movimientos.</td></tr>';
+  } else {
+    body.innerHTML = movs.map(m=>{
+      const a = m.autoId?getAuto(m.autoId):null;
+      const isCompra = m.tipo==='c';
+      const tipoBadge = isCompra?'<span class="b bor">＋ Compra</span>':'<span class="b bg2">＝ Pago</span>';
+      const monto = isCompra?`<span class="an">${fmt(-m.monto)}</span>`:`<span class="ap">${fmt(m.monto)}</span>`;
+      const msi = (isCompra && m.msi>1) ? `${m.msi} MSI` : (isCompra?'1 pago':'—');
+      return `<tr>
+        <td class="mo">${fdate(m.fecha)}</td>
+        <td>${tipoBadge}</td>
+        <td>${m.concepto||(isCompra?'(sin concepto)':'Pago a tarjeta')}${m.nota?'<div style="font-size:11px;color:var(--tx3)">'+m.nota+'</div>':''}</td>
+        <td>${a?a.nombre:'—'}</td>
+        <td class="mo">${msi}</td>
+        <td class="mo">${monto}</td>
+        <td>
+          <button class="btn bg sm tcMovEdit" data-id="${m.id}" data-tipo="${m.tipo}" style="margin-right:3px">✎</button>
+        </td>
+      </tr>`;
+    }).join('');
+    body.querySelectorAll('.tcMovEdit').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const id=b.dataset.id, t=b.dataset.tipo;
+        if(t==='c') abrirModalTcCompra(id); else abrirModalTcPago(id);
+      });
+    });
+  }
+}
+
+document.getElementById('tcFiltroTipo').addEventListener('change', renderTarjeta);
+
+// ═══════════════════════════════════════════════════════════
+// MODAL: COMPRA
+// ═══════════════════════════════════════════════════════════
+function abrirModalTcCompra(editId){
+  const ent = editId ? TARJETA.movs.find(m=>m.id===editId) : null;
+  document.getElementById('modalTcCompraTit').textContent = ent?'Editar compra':'Nueva compra con tarjeta';
+  document.getElementById('tcCompId').value = ent?ent.id:'';
+  document.getElementById('tcCompFecha').value = ent?ent.fecha:today();
+  document.getElementById('tcCompMonto').value = ent?ent.monto:'';
+  document.getElementById('tcCompConcepto').value = ent?(ent.concepto||''):'';
+  document.getElementById('tcCompMsi').value = ent?(ent.msi||1):1;
+  document.getElementById('tcCompCat').value = ent?(ent.categoria||'Reparaciones'):'Reparaciones';
+  document.getElementById('tcCompNota').value = ent?(ent.nota||''):'';
+  // Selects de autos y talleres
+  document.getElementById('tcCompAuto').innerHTML = '<option value="">— Ninguno (gasto general) —</option>'+
+    AUTOS.map(a=>`<option value="${a.id}"${ent&&ent.autoId===a.id?' selected':''}>${a.nombre}</option>`).join('');
+  document.getElementById('tcCompTaller').innerHTML = '<option value="">— Ninguno —</option>'+
+    TALLERES.map(t=>`<option value="${t.id}"${ent&&ent.tallerId===t.id?' selected':''}>${t.nombreCompleto||t.nombre||t.nombre1+' '+(t.nombre2||'')}</option>`).join('');
+  document.getElementById('btnTcCompDel').style.display = ent?'inline-flex':'none';
+  tcUpdateCompPreview();
+  document.getElementById('modalTcCompra').classList.add('on');
+}
+
+function tcUpdateCompPreview(){
+  const monto = Number(document.getElementById('tcCompMonto').value)||0;
+  const msi = Number(document.getElementById('tcCompMsi').value)||1;
+  const prev = document.getElementById('tcCompPreview');
+  if(monto<=0){ prev.innerHTML=''; return; }
+  if(msi<=1){
+    prev.innerHTML = `Cargo único de <strong style="color:var(--re)">${fmt(monto)}</strong> al próximo corte.<br>Después de esta compra: deuda total <strong style="color:var(--tx)">${fmt(tcDeudaTotal()+monto)}</strong> (${(((tcDeudaTotal()+monto)/TARJETA.limite)*100).toFixed(1)}% del límite).`;
+  } else {
+    const mens = monto/msi;
+    prev.innerHTML = `<strong style="color:var(--bl)">${msi} mensualidades</strong> de <strong style="color:var(--bl)">${fmt(mens)}</strong> c/u.<br>Esta compra ocupa <strong style="color:var(--tx)">${fmt(monto)}</strong> de tu línea desde ahora.<br>Deuda total después: <strong style="color:var(--tx)">${fmt(tcDeudaTotal()+monto)}</strong> (${(((tcDeudaTotal()+monto)/TARJETA.limite)*100).toFixed(1)}% del límite).`;
+  }
+}
+['tcCompMonto','tcCompMsi'].forEach(id=>document.getElementById(id).addEventListener('input', tcUpdateCompPreview));
+
+document.getElementById('btnTcCompCancel').addEventListener('click', ()=>document.getElementById('modalTcCompra').classList.remove('on'));
+document.getElementById('btnTcCompOk').addEventListener('click', ()=>{
+  const monto = Number(document.getElementById('tcCompMonto').value);
+  const concepto = document.getElementById('tcCompConcepto').value.trim();
+  if(!Number.isFinite(monto)||monto<=0) return toast('Monto inválido','er');
+  if(!concepto) return toast('Captura el concepto','er');
+  const id = document.getElementById('tcCompId').value;
+  const obj = {
+    tipo: 'c',
+    fecha: document.getElementById('tcCompFecha').value||today(),
+    monto: monto,
+    msi: Number(document.getElementById('tcCompMsi').value)||1,
+    concepto,
+    categoria: document.getElementById('tcCompCat').value,
+    autoId: document.getElementById('tcCompAuto').value||null,
+    tallerId: document.getElementById('tcCompTaller').value||null,
+    nota: document.getElementById('tcCompNota').value.trim()
+  };
+  if(id){
+    const idx = TARJETA.movs.findIndex(m=>m.id===id);
+    if(idx>=0) TARJETA.movs[idx] = {...TARJETA.movs[idx], ...obj};
+  } else {
+    obj.id = uid(); obj._ts = Date.now();
+    TARJETA.movs.push(obj);
+  }
+  save();
+  document.getElementById('modalTcCompra').classList.remove('on');
+  renderTarjeta();
+  toast(id?'✓ Compra actualizada':'✓ Compra registrada');
+});
+document.getElementById('btnTcCompDel').addEventListener('click', async()=>{
+  const id = document.getElementById('tcCompId').value;
+  if(!id) return;
+  if(!await confirmar('¿Eliminar esta compra?'))return;
+  TARJETA.movs = TARJETA.movs.filter(m=>m.id!==id);
+  save();
+  document.getElementById('modalTcCompra').classList.remove('on');
+  renderTarjeta();
+  toast('Compra eliminada');
+});
+
+// ═══════════════════════════════════════════════════════════
+// MODAL: PAGO
+// ═══════════════════════════════════════════════════════════
+function abrirModalTcPago(editId){
+  const ent = editId ? TARJETA.movs.find(m=>m.id===editId) : null;
+  document.getElementById('tcPagId').value = ent?ent.id:'';
+  document.getElementById('tcPagFecha').value = ent?ent.fecha:today();
+  document.getElementById('tcPagMonto').value = ent?ent.monto:'';
+  document.getElementById('tcPagNota').value = ent?(ent.nota||''):'';
+  document.getElementById('btnTcPagDel').style.display = ent?'inline-flex':'none';
+  document.getElementById('modalTcPago').classList.add('on');
+}
+document.getElementById('btnTcPagCancel').addEventListener('click', ()=>document.getElementById('modalTcPago').classList.remove('on'));
+document.getElementById('btnTcPagOk').addEventListener('click', ()=>{
+  const monto = Number(document.getElementById('tcPagMonto').value);
+  if(!Number.isFinite(monto)||monto<=0) return toast('Monto inválido','er');
+  const id = document.getElementById('tcPagId').value;
+  const obj = {
+    tipo: 'p',
+    fecha: document.getElementById('tcPagFecha').value||today(),
+    monto,
+    nota: document.getElementById('tcPagNota').value.trim()
+  };
+  if(id){
+    const idx = TARJETA.movs.findIndex(m=>m.id===id);
+    if(idx>=0) TARJETA.movs[idx] = {...TARJETA.movs[idx], ...obj};
+  } else {
+    obj.id = uid(); obj._ts = Date.now();
+    TARJETA.movs.push(obj);
+  }
+  save();
+  document.getElementById('modalTcPago').classList.remove('on');
+  renderTarjeta();
+  toast(id?'✓ Pago actualizado':'✓ Pago registrado');
+});
+document.getElementById('btnTcPagDel').addEventListener('click', async()=>{
+  const id = document.getElementById('tcPagId').value;
+  if(!id) return;
+  if(!await confirmar('¿Eliminar este pago?'))return;
+  TARJETA.movs = TARJETA.movs.filter(m=>m.id!==id);
+  save();
+  document.getElementById('modalTcPago').classList.remove('on');
+  renderTarjeta();
+  toast('Pago eliminado');
+});
+
+// ═══════════════════════════════════════════════════════════
+// MODAL: CONFIG
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btnTcConfig').addEventListener('click', ()=>{
+  document.getElementById('tcCfgLimite').value = TARJETA.limite;
+  document.getElementById('tcCfgCorte').value = TARJETA.diaCorte;
+  document.getElementById('tcCfgPago').value = TARJETA.diaPago;
+  document.getElementById('tcCfgNombre').value = TARJETA.nombre||'';
+  document.getElementById('modalTcConfig').classList.add('on');
+});
+document.getElementById('btnTcCfgCancel').addEventListener('click', ()=>document.getElementById('modalTcConfig').classList.remove('on'));
+document.getElementById('btnTcCfgOk').addEventListener('click', ()=>{
+  TARJETA.limite = Number(document.getElementById('tcCfgLimite').value)||10000;
+  TARJETA.diaCorte = Math.max(1,Math.min(31,Number(document.getElementById('tcCfgCorte').value)||15));
+  TARJETA.diaPago = Math.max(1,Math.min(31,Number(document.getElementById('tcCfgPago').value)||5));
+  TARJETA.nombre = document.getElementById('tcCfgNombre').value.trim() || 'Tarjeta de crédito';
+  save();
+  document.getElementById('modalTcConfig').classList.remove('on');
+  renderTarjeta();
+  toast('✓ Configuración guardada');
+});
+
+document.getElementById('btnTcCompra').addEventListener('click', ()=>abrirModalTcCompra(null));
+document.getElementById('btnTcPago').addEventListener('click', ()=>abrirModalTcPago(null));
 
 // ═══════════════════════════════════════════════════════════
 // MODAL DE KILOMETRAJE — abrir desde Mis Autos o Mantenimiento
