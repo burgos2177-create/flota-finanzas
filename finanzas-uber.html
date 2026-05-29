@@ -628,8 +628,20 @@ tr.d3{background:rgba(248,113,113,.04)}
       <canvas id="saldoChart"></canvas>
       <div class="chart-tip" id="saldoTip"></div>
     </div>
-    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--tx3)">
-      <span><span style="display:inline-block;width:14px;height:3px;background:var(--gr);margin-right:5px;vertical-align:middle;border-radius:2px"></span>Saldo total flota</span>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--tx3);flex-wrap:wrap">
+      <span><span style="display:inline-block;width:14px;height:3px;background:var(--gr);margin-right:5px;vertical-align:middle;border-radius:2px"></span>Saldo neto (− deuda TDC)</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:var(--tx2);margin-right:5px;vertical-align:middle;border-radius:2px;opacity:.55"></span>Saldo bruto (sin restar TDC)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">💳 Deuda de tarjeta de crédito</div>
+    <div class="chart-wrap" style="height:130px">
+      <canvas id="deudaChart"></canvas>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:6px;font-size:11px;color:var(--tx3);flex-wrap:wrap">
+      <span><span style="display:inline-block;width:14px;height:3px;background:#fb923c;margin-right:5px;vertical-align:middle;border-radius:2px"></span>Deuda TDC</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:rgba(248,113,113,.55);margin-right:5px;vertical-align:middle;border-radius:2px"></span>Límite de crédito</span>
     </div>
   </div>
 </div>
@@ -3616,7 +3628,7 @@ document.getElementById('btnOkTaller').addEventListener('click',()=>{
 // ═══════════════════════════════════════════════════════════
 let _saldoPeriod='ALL';
 const ALL_CATS=['Abonos','Reparaciones','Reinversión','GPS','Seguro','Inactividad','Administración','Adquisiciones/Venta','Utilidad','Otro'];
-let _saldoExcluded=new Set(); // categories excluded from the chart
+let _saldoExcluded=new Set(S.get('ff_saldo_excluded',['Adquisiciones/Venta'])); // por default excluye adquisiciones
 
 function renderSaldoCatFiltros(){
   const el=document.getElementById('saldoCatFiltros');
@@ -3630,6 +3642,7 @@ function renderSaldoCatFiltros(){
     pill.addEventListener('click',()=>{
       if(_saldoExcluded.has(cat))_saldoExcluded.delete(cat);
       else _saldoExcluded.add(cat);
+      S.set('ff_saldo_excluded',[..._saldoExcluded]);
       renderSaldoCatFiltros();
       drawSaldoChart();
     });
@@ -3638,10 +3651,26 @@ function renderSaldoCatFiltros(){
 }
 
 function getBalanceTimeline(period){
-  const sorted=[...MOVS].filter(m=>!_saldoExcluded.has(m.categoria)).sort((a,b)=>a.fecha.localeCompare(b.fecha)||a._ts-b._ts);
-  if(!sorted.length)return[];
-  let bal=0;
-  const all=sorted.map(m=>({date:new Date(m.fecha+'T12:00:00'),balance:(bal+=Number(m.monto),bal)}));
+  // Construir un mapa unificado por fecha con deltas de bruto y deuda
+  const byDate = new Map();
+  const ensureKey = k => { if(!byDate.has(k)) byDate.set(k,{brutoD:0, deudaD:0}); return byDate.get(k); };
+  // MOVS — saldo bruto (excluimos pagos a TDC ya que no son ingresos de auto)
+  MOVS.filter(m=>!_saldoExcluded.has(m.categoria))
+      .filter(m=>!(m.cuenta==='credito' && Number(m.monto)>0))
+      .forEach(m=>{ ensureKey(m.fecha).brutoD += Number(m.monto); });
+  // TARJETA.movs — deuda (compra+, pago-)
+  (TARJETA.movs||[]).forEach(t=>{
+    if(t.tipo==='c') ensureKey(t.fecha).deudaD += Number(t.monto);
+    else if(t.tipo==='p') ensureKey(t.fecha).deudaD -= Number(t.monto);
+  });
+  if(byDate.size===0) return [];
+  const dates = [...byDate.keys()].sort();
+  let bruto=0, deuda=0;
+  const all = dates.map(d=>{
+    const e = byDate.get(d);
+    bruto += e.brutoD; deuda += e.deudaD;
+    return { date: new Date(d+'T12:00:00'), bruto, deuda, neto: bruto - deuda, balance: bruto - deuda };
+  });
   const now=new Date();
   let start=null;
   if(period==='1D')start=new Date(now-86400000);
@@ -3653,11 +3682,11 @@ function getBalanceTimeline(period){
   else if(period==='YTD')start=new Date(now.getFullYear(),0,1);
   else if(period==='1Y'){start=new Date(now);start.setFullYear(start.getFullYear()-1);}
   else if(period==='2Y'){start=new Date(now);start.setFullYear(start.getFullYear()-2);}
-  if(!start)return all;
+  if(!start) return all;
   const before=all.filter(p=>p.date<start);
-  const startBal=before.length?before[before.length-1].balance:0;
+  const startPoint = before.length ? before[before.length-1] : {bruto:0,deuda:0,neto:0,balance:0};
   const filtered=all.filter(p=>p.date>=start);
-  if(!filtered.length||filtered[0].date>start)filtered.unshift({date:start,balance:startBal});
+  if(!filtered.length||filtered[0].date>start) filtered.unshift({date:start, bruto:startPoint.bruto, deuda:startPoint.deuda, neto:startPoint.neto, balance:startPoint.balance});
   return filtered;
 }
 
@@ -3679,10 +3708,16 @@ function drawSaldoChart(){
   if(!points.length){
     ctx.fillStyle='rgba(139,144,160,0.4)';ctx.font='14px "Sora",sans-serif';ctx.textAlign='center';
     ctx.fillText('Sin movimientos registrados',W/2,H/2);
-    document.getElementById('saldoStats').innerHTML='';return;
+    document.getElementById('saldoStats').innerHTML='';
+    const dC=document.getElementById('deudaChart');
+    if(dC){ const dctx=dC.getContext('2d'); dC.width=W*dpr; dC.height=120*dpr; dC.style.width=W+'px'; dC.style.height='120px'; dctx.clearRect(0,0,W,120); }
+    return;
   }
-  const vals=points.map(p=>p.balance);
-  let minV=Math.min(...vals),maxV=Math.max(...vals);
+  // Eje Y considera tanto bruto como neto
+  const valsNeto=points.map(p=>p.neto);
+  const valsBruto=points.map(p=>p.bruto);
+  const allVals=valsNeto.concat(valsBruto);
+  let minV=Math.min(...allVals),maxV=Math.max(...allVals);
   const pad2=(maxV-minV)*0.08||Math.abs(maxV)*0.08||500;
   minV-=pad2;maxV+=pad2;
   const range=maxV-minV;
@@ -3705,20 +3740,24 @@ function drawSaldoChart(){
     ctx.fillStyle='rgba(255,255,255,0.25)';ctx.font='9px "DM Mono",monospace';ctx.textAlign='right';
     ctx.fillText('0',pad.left-4,y0+4);
   }
-  const lastBal=vals[vals.length-1];
-  const lineColor=lastBal>=0?'#4ade80':'#f87171';
-  const gradTop=lastBal>=0?'rgba(74,222,128,0.22)':'rgba(248,113,113,0.22)';
-  // Gradient fill
+  const lastNeto=valsNeto[valsNeto.length-1];
+  const lineColor=lastNeto>=0?'#4ade80':'#f87171';
+  const gradTop=lastNeto>=0?'rgba(74,222,128,0.22)':'rgba(248,113,113,0.22)';
+  // Gradient fill (sobre saldo NETO)
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
   grad.addColorStop(0,gradTop);grad.addColorStop(1,'rgba(0,0,0,0)');
   ctx.beginPath();
-  points.forEach((p,i)=>{const x=toX(i),y=toY(p.balance);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  points.forEach((p,i)=>{const x=toX(i),y=toY(p.neto);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
   ctx.lineTo(toX(n-1),pad.top+cH);ctx.lineTo(toX(0),pad.top+cH);ctx.closePath();
   ctx.fillStyle=grad;ctx.fill();
-  // Line
+  // Bruto (línea tenue de referencia)
   ctx.beginPath();
-  points.forEach((p,i)=>{const x=toX(i),y=toY(p.balance);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
-  ctx.strokeStyle=lineColor;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(p.bruto);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle='rgba(139,144,160,0.55)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.lineJoin='round';ctx.stroke();ctx.setLineDash([]);
+  // Neto (línea principal)
+  ctx.beginPath();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(p.neto);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle=lineColor;ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.stroke();
   // Y-axis labels
   ctx.fillStyle='rgba(139,144,160,0.85)';ctx.font='10px "DM Mono",monospace';ctx.textAlign='right';
   for(let i=0;i<=gLines;i++){
@@ -3736,14 +3775,61 @@ function drawSaldoChart(){
     ctx.fillText(`${d.getDate()}/${d.getMonth()+1}`,toX(i),H-8);
   }
   // Stats
-  const startBal=vals[0];
-  const change=lastBal-startBal;
+  const startBal=valsNeto[0], startBruto=valsBruto[0];
+  const lastBruto=valsBruto[valsBruto.length-1];
+  const lastDeuda=points[points.length-1].deuda;
+  const change=lastNeto-startBal;
   const changePct=startBal!==0?(change/Math.abs(startBal)*100).toFixed(1):'—';
   document.getElementById('saldoStats').innerHTML=`
-    <div class="sc"><div class="sl">Saldo actual</div><div class="sv ${lastBal>=0?'g':'r'}">${fmt(lastBal)}</div></div>
-    <div class="sc"><div class="sl">Inicio período</div><div class="sv">${fmt(startBal)}</div></div>
-    <div class="sc"><div class="sl">Cambio</div><div class="sv ${change>=0?'g':'r'}">${change>=0?'+':''}${fmt(change)}</div></div>
-    <div class="sc"><div class="sl">Variación</div><div class="sv ${change>=0?'g':'r'}">${change>=0?'+':''}${changePct==='—'?'—':changePct+'%'}</div></div>`;
+    <div class="sc"><div class="sl">Saldo neto (− deuda)</div><div class="sv ${lastNeto>=0?'g':'r'}">${fmt(lastNeto)}</div></div>
+    <div class="sc"><div class="sl">Saldo bruto</div><div class="sv ${lastBruto>=0?'g':'r'}" style="opacity:.85">${fmt(lastBruto)}</div></div>
+    <div class="sc"><div class="sl">Deuda TDC</div><div class="sv r">${fmt(lastDeuda)}</div></div>
+    <div class="sc"><div class="sl">Cambio período</div><div class="sv ${change>=0?'g':'r'}">${change>=0?'+':''}${fmt(change)}<br><span style="font-size:11px;opacity:.7">${change>=0?'+':''}${changePct==='—'?'—':changePct+'%'}</span></div></div>`;
+  // Render gráfica secundaria de deuda
+  drawDeudaChart(points);
+}
+
+function drawDeudaChart(points){
+  const canvas=document.getElementById('deudaChart');
+  if(!canvas)return;
+  const container=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  const W=container.clientWidth||800;
+  const H=120;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  if(!points || !points.length) return;
+  const pad={top:14,right:20,bottom:22,left:76};
+  const cW=W-pad.left-pad.right, cH=H-pad.top-pad.bottom;
+  const vals=points.map(p=>Math.max(0,p.deuda));
+  let minV=0, maxV=Math.max(...vals, TARJETA.limite||10000);
+  const range=maxV-minV||1;
+  const n=points.length;
+  const toX=i=>pad.left+(i/(n-1||1))*cW;
+  const toY=v=>pad.top+cH-((v-minV)/range)*cH;
+  // Línea horizontal del límite
+  const yLim=toY(TARJETA.limite||10000);
+  ctx.strokeStyle='rgba(248,113,113,0.55)';ctx.setLineDash([5,4]);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad.left,yLim);ctx.lineTo(pad.left+cW,yLim);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(248,113,113,0.7)';ctx.font='9px "DM Mono",monospace';ctx.textAlign='right';
+  ctx.fillText('Límite '+(TARJETA.limite||10000).toLocaleString('es-MX'), pad.left-4, yLim+3);
+  // Gradient + line
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
+  grad.addColorStop(0,'rgba(251,146,60,0.30)');grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(Math.max(0,p.deuda));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.lineTo(toX(n-1),pad.top+cH);ctx.lineTo(toX(0),pad.top+cH);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();
+  points.forEach((p,i)=>{const x=toX(i),y=toY(Math.max(0,p.deuda));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.strokeStyle='#fb923c';ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
+  // Labels Y (solo min/max)
+  ctx.fillStyle='rgba(139,144,160,0.85)';ctx.font='10px "DM Mono",monospace';ctx.textAlign='right';
+  ctx.fillText(maxV.toLocaleString('es-MX',{maximumFractionDigits:0}), pad.left-5, pad.top+4);
+  ctx.fillText('0', pad.left-5, pad.top+cH+3);
 }
 
 function initSaldoTooltip(){
@@ -3765,7 +3851,9 @@ function initSaldoTooltip(){
     const d=p.date;
     const ds=`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
     tip.innerHTML=`<div style="font-family:var(--mo);font-size:10px;color:var(--tx3)">${ds}</div>
-      <div style="font-family:var(--mo);font-size:14px;font-weight:600;color:${p.balance>=0?'var(--gr)':'var(--re)'}">${fmt(p.balance)}</div>`;
+      <div style="font-family:var(--mo);font-size:13px;font-weight:600;color:${p.neto>=0?'var(--gr)':'var(--re)'}">${fmt(p.neto)} <span style="font-size:9px;color:var(--tx3);font-weight:400">neto</span></div>
+      <div style="font-family:var(--mo);font-size:11px;color:var(--tx2)">${fmt(p.bruto)} <span style="font-size:9px;color:var(--tx3)">bruto</span></div>
+      <div style="font-family:var(--mo);font-size:11px;color:#fb923c">${fmt(p.deuda)} <span style="font-size:9px;color:var(--tx3)">deuda</span></div>`;
     tip.style.display='block';
     const tipL=Math.min(mx+14,rect.width-130);
     const tipT=Math.max(4,(e.clientY-rect.top)-44);
