@@ -331,8 +331,26 @@ tr.d3{background:rgba(248,113,113,.04)}
       </div>
       <div class="fo"><label>Concepto *</label><input type="text" id="mvConcepto" placeholder="Describe el movimiento" list="repConceptoList" autocomplete="off"><datalist id="repConceptoList"></datalist></div>
       <div class="fo"><label>Monto (+ ingreso / − egreso) *</label><input type="number" id="mvMonto" placeholder="Ej: 2200 ó -3500" step="0.01"></div>
-      <div class="fo"><label>Nota</label><input type="text" id="mvNota" placeholder="Detalle opcional"></div>
+      <div class="fo"><label>Pagado con</label>
+        <select id="mvCuenta">
+          <option value="debito">💵 Débito / Efectivo</option>
+          <option value="credito">💳 Crédito (TDC)</option>
+        </select>
+      </div>
+      <div class="fo" id="foMvMsi" style="display:none"><label>MSI</label>
+        <select id="mvMsi">
+          <option value="1">De contado</option>
+          <option value="3">3 MSI</option>
+          <option value="6">6 MSI</option>
+          <option value="9">9 MSI</option>
+          <option value="12">12 MSI</option>
+          <option value="18">18 MSI</option>
+          <option value="24">24 MSI</option>
+        </select>
+      </div>
+      <div class="fo full"><label>Nota</label><input type="text" id="mvNota" placeholder="Detalle opcional"></div>
     </div>
+    <div id="mvCuentaHint" style="display:none;background:var(--bld);border:1px solid rgba(96,165,250,.3);border-radius:7px;padding:8px 11px;margin:-6px 0 10px;font-size:11px;color:var(--bl)"></div>
     <div id="abonoPanel" class="ap2" style="display:none">
       <div class="apt">⬤ Detalles del abono</div>
       <div class="fg" style="margin-bottom:12px">
@@ -1475,7 +1493,20 @@ const getAuto=id=>id==='__general__'?AUTO_GENERAL:AUTOS.find(a=>a.id===id);
 const getChofer=id=>CHOFERES.find(c=>c.id===id);
 
 function getSaldo(autoId){
-  return MOVS.filter(m=>m.autoId===autoId).reduce((s,m)=>s+Number(m.monto),0);
+  // Excluye pagos a TDC (ingresos con cuenta=credito) — esos son transferencias
+  // de débito → TDC, no son ingresos del auto.
+  return MOVS.filter(m=>m.autoId===autoId)
+             .filter(m=>!(m.cuenta==='credito' && Number(m.monto)>0))
+             .reduce((s,m)=>s+Number(m.monto),0);
+}
+
+// Elimina un MOV y, si tenía un TDC vinculado, también lo borra ahí.
+function eliminarMovConTdc(movId){
+  const mov = MOVS.find(m=>m.id===movId);
+  if(mov && mov.tdcId){
+    TARJETA.movs = TARJETA.movs.filter(x=>x.id!==mov.tdcId);
+  }
+  MOVS = MOVS.filter(m=>m.id!==movId);
 }
 function getMovsAuto(autoId){
   const ms=[...MOVS.filter(m=>m.autoId===autoId)].sort((a,b)=>a.fecha.localeCompare(b.fecha)||a._ts-b._ts);
@@ -1553,14 +1584,26 @@ function renderDash(){
   const activos=AUTOS.filter(a=>a.estado==='activo').length;
   const mes=new Date().toISOString().slice(0,7);
   const mm=MOVS.filter(m=>m.fecha.startsWith(mes));
-  const ing=mm.filter(m=>m.monto>0).reduce((s,m)=>s+Number(m.monto),0);
-  const egr=mm.filter(m=>m.monto<0).reduce((s,m)=>s+Number(m.monto),0);
+  // Ingresos = entradas reales de efectivo (débito + monto positivo)
+  // Egresos  = salidas reales de efectivo (débito + monto negativo) y los pagos a TDC (credito + monto positivo)
+  const ing = mm.filter(m=>m.cuenta!=='credito' && m.monto>0)
+                .reduce((s,m)=>s+Number(m.monto),0);
+  const egr = mm.filter(m=>m.cuenta!=='credito' && m.monto<0)
+                .reduce((s,m)=>s+Number(m.monto),0)
+              - mm.filter(m=>m.cuenta==='credito' && m.monto>0)
+                  .reduce((s,m)=>s+Number(m.monto),0);
 
+  const tdcDeuda = tcDeudaTotal();
+  const tdcDisp = tcDisponible();
+  const tdcPct = tcUsoPct();
+  const tdcColor = tdcPct>=85?'r':tdcPct>=60?'y':'g';
   document.getElementById('dStats').innerHTML=`
     <div class="sc"><div class="sl">Saldo total flota</div><div class="sv ${totSaldo>=0?'g':'r'}">${fmt(totSaldo)}</div></div>
     <div class="sc"><div class="sl">Autos activos</div><div class="sv">${activos}/${AUTOS.length}</div></div>
     <div class="sc"><div class="sl">Ingresos este mes</div><div class="sv g">${fmt(ing)}</div></div>
-    <div class="sc"><div class="sl">Egresos este mes</div><div class="sv r">${fmt(Math.abs(egr))}</div></div>`;
+    <div class="sc"><div class="sl">Egresos este mes</div><div class="sv r">${fmt(Math.abs(egr))}</div></div>
+    <div class="sc" style="cursor:pointer" onclick="goTo('tarjeta')"><div class="sl">💳 TDC usado</div><div class="sv ${tdcColor}">${fmt(tdcDeuda)}</div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo);margin-top:2px">${tdcPct.toFixed(1)}% de ${fmt(TARJETA.limite)}</div></div>
+    <div class="sc" style="cursor:pointer" onclick="goTo('tarjeta')"><div class="sl">💳 TDC disponible</div><div class="sv g">${fmt(tdcDisp)}</div></div>`;
 
   if(!AUTOS.length){
     document.getElementById('dFlota').innerHTML='<div class="emp"><div style="font-size:32px;margin-bottom:10px">🚗</div><p>Sin autos aún.</p></div>';
@@ -1724,6 +1767,10 @@ function initMov(){
   document.getElementById('mvConcepto').value='';
   document.getElementById('mvMonto').value='';
   document.getElementById('mvNota').value='';
+  document.getElementById('mvCuenta').value='debito';
+  document.getElementById('mvMsi').value='1';
+  document.getElementById('foMvMsi').style.display='none';
+  document.getElementById('mvCuentaHint').style.display='none';
   document.getElementById('abonoPanel').style.display='none';
   document.getElementById('inacPanel').style.display='none';
   document.getElementById('repPanel').style.display='none';
@@ -1788,6 +1835,37 @@ document.getElementById('mvFecha').addEventListener('change',()=>{
 document.getElementById('mvSemana').addEventListener('change',autoConcepto);
 document.getElementById('mvChoferAbono').addEventListener('change',updateCompletarPanel);
 
+// Reactivos para mvCuenta / mvMonto: muestra MSI cuando cuenta=credito + monto<0
+function _updateMvCuentaUI(){
+  const cuenta = document.getElementById('mvCuenta').value;
+  const monto = parseFloat(document.getElementById('mvMonto').value)||0;
+  const hint = document.getElementById('mvCuentaHint');
+  const foMsi = document.getElementById('foMvMsi');
+  if(cuenta==='credito'){
+    if(monto<0){
+      foMsi.style.display='';
+      const msi = Number(document.getElementById('mvMsi').value)||1;
+      const mens = msi>1 ? `${msi} mensualidades de ${fmt(Math.abs(monto)/msi)}` : 'un solo pago';
+      hint.innerHTML = `💳 <strong>Compra con TDC</strong> — la deuda sube ${fmt(Math.abs(monto))} (${mens}). El saldo del auto refleja el gasto, pero el efectivo no se mueve.`;
+      hint.style.display='block';
+    } else if(monto>0){
+      foMsi.style.display='none';
+      const deuda = tcDeudaTotal();
+      hint.innerHTML = `💳 <strong>Pago a TDC</strong> (proviene de débito) — la deuda baja ${fmt(monto)} (de ${fmt(deuda)} a ${fmt(Math.max(0,deuda-monto))}). No afecta el saldo de ningún auto.`;
+      hint.style.display='block';
+    } else {
+      foMsi.style.display='none';
+      hint.style.display='none';
+    }
+  } else {
+    foMsi.style.display='none';
+    hint.style.display='none';
+  }
+}
+document.getElementById('mvCuenta').addEventListener('change',_updateMvCuentaUI);
+document.getElementById('mvMonto').addEventListener('input',_updateMvCuentaUI);
+document.getElementById('mvMsi').addEventListener('change',_updateMvCuentaUI);
+
 document.getElementById('btnGuardarMov').addEventListener('click',()=>{
   const autoId=document.getElementById('mvAuto').value;
   const fecha=document.getElementById('mvFecha').value;
@@ -1801,7 +1879,21 @@ document.getElementById('btnGuardarMov').addEventListener('click',()=>{
   if(!concepto)return toast('Escribe el concepto','er');
   if(isNaN(monto)||monto===0)return toast('Monto inválido','er');
 
-  const mov={id:uid(),autoId,fecha,categoria,concepto,monto,nota,_ts:Date.now()};
+  const cuenta = document.getElementById('mvCuenta').value || 'debito';
+  const msi = cuenta==='credito' && monto<0 ? (Number(document.getElementById('mvMsi').value)||1) : 1;
+  const mov={id:uid(),autoId,fecha,categoria,concepto,monto,nota,cuenta,msi,_ts:Date.now()};
+  // Si es crédito, también crear/sincronizar en TARJETA.movs
+  if(cuenta==='credito'){
+    const tdcId = uid();
+    mov.tdcId = tdcId;
+    if(monto<0){
+      // Compra con TDC
+      TARJETA.movs.push({id:tdcId, tipo:'c', fecha, monto:Math.abs(monto), msi, concepto, categoria, autoId, tallerId:null, nota, movId:mov.id, _ts:Date.now()});
+    } else if(monto>0){
+      // Pago a TDC desde débito
+      TARJETA.movs.push({id:tdcId, tipo:'p', fecha, monto, nota:nota||'Pago desde débito', movId:mov.id, _ts:Date.now()});
+    }
+  }
   if(categoria==='Abonos'){
     mov.delay=_delay;
     mov.semana=document.getElementById('mvSemana').value||'';
@@ -1907,7 +1999,7 @@ function renderBitacora(){
         <td style="font-weight:500;color:var(--tx)">${a?a.nombre:'—'}</td>
         <td>${ch?ch.nombre:'—'}</td>
         <td>${catBadge(m.categoria)}</td>
-        <td>${m.concepto}</td>
+        <td>${m.concepto}${m.cuenta==='credito'?' <span class="b bb" style="font-size:9px;padding:1px 5px;margin-left:4px">💳 '+(m.msi>1?m.msi+' MSI':'TDC')+'</span>':''}</td>
         <td>${m.delay!==undefined?delBadge(m.delay):''}</td>
         <td class="${m.monto>=0?'ap':'an'}">${fmt(m.monto)}</td>
         <td class="ab">${fmt(sal)}</td>
@@ -1919,7 +2011,7 @@ function renderBitacora(){
       tr.querySelector('.btnEditMov').addEventListener('click',()=>abrirEditMov(m));
       tr.querySelector('.btnDelMov').addEventListener('click',async()=>{
         if(!await confirmar('¿Eliminar este movimiento?'))return;
-        MOVS=MOVS.filter(x=>x.id!==m.id);
+        eliminarMovConTdc(m.id);
         save();renderBitacora();toast('Movimiento eliminado');
       });
       tbody.appendChild(tr);
@@ -2048,7 +2140,7 @@ function verBitacoraAuto(autoId){
         <td class="mo">${fdate(m.fecha)}</td>
         <td>${ch?ch.nombre:'—'}</td>
         <td>${catBadge(m.categoria)}</td>
-        <td>${m.concepto}</td>
+        <td>${m.concepto}${m.cuenta==='credito'?' <span class="b bb" style="font-size:9px;padding:1px 5px;margin-left:4px">💳 '+(m.msi>1?m.msi+' MSI':'TDC')+'</span>':''}</td>
         <td>${m.delay!==undefined?delBadge(m.delay):''}</td>
         <td class="${m.monto>=0?'ap':'an'}">${fmt(m.monto)}</td>
         <td class="ab">${fmt(m.sal)}</td>
@@ -2056,7 +2148,7 @@ function verBitacoraAuto(autoId){
         <td><button class="btn bd sm">✕</button></td>`;
       tr.querySelector('button').addEventListener('click',async()=>{
         if(!await confirmar('¿Eliminar este movimiento?'))return;
-        MOVS=MOVS.filter(x=>x.id!==m.id);
+        eliminarMovConTdc(m.id);
         save();verBitacoraAuto(autoId);renderAutos();toast('Eliminado');
       });
       tbody.appendChild(tr);
