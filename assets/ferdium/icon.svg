@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- FlotaFinanzas · SOGRUB suite · domain: gestión financiera de flota Uber -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2334"/>
+      <stop offset="1" stop-color="#0d0f15"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5ef08f"/>
+      <stop offset="1" stop-color="#3fce72"/>
+    </linearGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0V64H0" fill="none" stroke="#4ade80" stroke-opacity="0.07" stroke-width="1.5"/>
+    </pattern>
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232"/>
+    </clipPath>
+  </defs>
+
+  <!-- squircle background -->
+  <g clip-path="url(#squircle)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"/>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#grid)"/>
+    <!-- subtle accent glow lower-right -->
+    <circle cx="830" cy="850" r="340" fill="#4ade80" fill-opacity="0.04"/>
+  </g>
+
+  <!-- glyph: side-view car (fleet) carrying a $ (finance) -->
+  <g transform="translate(512 506) scale(1.08) translate(-512 -506)">
+    <!-- car body + cabin, one bold accent silhouette -->
+    <path d="M250 612
+             L250 558
+             Q250 536 272 530
+             L362 502
+             L404 426
+             Q416 402 448 402
+             L598 402
+             Q630 402 646 428
+             L692 502
+             L762 524
+             Q784 530 784 556
+             L784 612
+             Z"
+          fill="url(#accent)"/>
+
+    <!-- engraved windows (background color) -->
+    <path d="M428 488 L462 432 L520 432 L520 488 Z" fill="#0f1117"/>
+    <path d="M540 432 L590 432 Q606 432 614 450 L632 488 L540 488 Z" fill="#0f1117"/>
+
+    <!-- engraved $ on the door / body (finance mark) -->
+    <text x="512" y="592" font-family="DejaVu Sans, Arial, sans-serif" font-size="138"
+          font-weight="800" text-anchor="middle" fill="#0f1117">$</text>
+
+    <!-- wheels: accent tyres with engraved hubs -->
+    <circle cx="364" cy="614" r="80" fill="url(#accent)"/>
+    <circle cx="668" cy="614" r="80" fill="url(#accent)"/>
+    <circle cx="364" cy="614" r="34" fill="#0f1117"/>
+    <circle cx="668" cy="614" r="34" fill="#0f1117"/>
+    <circle cx="364" cy="614" r="11" fill="#4ade80"/>
+    <circle cx="668" cy="614" r="11" fill="#4ade80"/>
+  </g>
+</svg>
