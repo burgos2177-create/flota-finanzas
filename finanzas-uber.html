@@ -4940,6 +4940,17 @@ async function _psnInitFirebase(){
         if(btnS)btnS.disabled=true;
       }
     });
+    // Si volvemos de un signInWithRedirect (login sin popup en Ferdium/webview),
+    // recoge aquí el resultado. El éxito lo maneja onAuthStateChanged; esto
+    // sirve para confirmar y para mostrar errores del retorno (p. ej. dominio
+    // no autorizado en Firebase Auth).
+    _psnAuth.getRedirectResult().then(res=>{
+      if(res && res.user) toast('✓ Sesión iniciada');
+    }).catch(e=>{
+      console.error('psn redirect result:', e);
+      _psnSetDot('err', 'Error al iniciar sesión: '+(e.message||e.code||''));
+      toast('Error al iniciar sesión','er');
+    });
   }catch(e){ console.error('psn init:', e); }
   return _psnApp;
 }
@@ -4947,12 +4958,32 @@ async function _psnInitFirebase(){
 async function _psnLogin(){
   await _psnInitFirebase();
   if(!_psnAuth){ toast('Firebase no disponible','er'); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
   try{
     _psnSetDot('sync','Iniciando sesión...');
-    const provider = new firebase.auth.GoogleAuthProvider();
     await _psnAuth.signInWithPopup(provider);
     toast('✓ Sesión iniciada');
   }catch(e){
+    const code = (e && e.code) || '';
+    // Webviews embebidos (Ferdium/Electron) bloquean la ventana emergente.
+    // En ese caso usamos el flujo de redirect, que no necesita popup.
+    const popupFail = code==='auth/popup-blocked'
+      || code==='auth/operation-not-supported-in-this-environment'
+      || code==='auth/cancelled-popup-request'
+      || code==='auth/popup-closed-by-user'
+      || code==='auth/web-storage-unsupported';
+    if(popupFail){
+      try{
+        _psnSetDot('sync','Redirigiendo a Google…');
+        await _psnAuth.signInWithRedirect(provider);
+        return; // la página navega a Google; al volver lo recoge getRedirectResult()
+      }catch(e2){
+        console.error('psn login redirect:', e2);
+        _psnSetDot('err', 'Error al iniciar sesión: '+(e2.message||e2.code||''));
+        toast('Error al iniciar sesión','er');
+        return;
+      }
+    }
     console.error('psn login:', e);
     _psnSetDot('err', 'Error al iniciar sesión: '+(e.message||e.code||''));
     toast('Error al iniciar sesión','er');
