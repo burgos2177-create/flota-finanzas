@@ -277,6 +277,7 @@ tr.d3{background:rgba(248,113,113,.04)}
   <div class="ni" data-pg="nube" style="justify-content:space-between">
     <span>☁ &nbsp;Sincronización</span><span id="cloudDot" style="font-size:9px">⚫</span>
   </div>
+  <div class="ni" id="btnPassFerdium" style="display:none">🔑 &nbsp;Pass Ferdium</div>
 </nav>
 
 <main>
@@ -806,6 +807,20 @@ tr.d3{background:rgba(248,113,113,.04)}
       <button class="btn bp" id="btnPsnSync" disabled>↗ &nbsp;Sincronizar saldo ahora</button>
       <button class="btn bd" id="btnPsnLogout" style="display:none">✕ &nbsp;Cerrar sesión</button>
     </div>
+
+    <div id="psnEmailBox" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--bor)">
+      <div style="font-size:12px;color:var(--tx2);margin-bottom:12px;line-height:1.7">
+        ¿Estás en <strong style="color:var(--tx)">Ferdium</strong> u otra app donde el popup de Google no abre? Entra con tu
+        <strong style="color:var(--tx)">correo + contraseña</strong> — es el <strong style="color:var(--tx)">mismo usuario y los mismos datos</strong>.
+        La contraseña se crea una sola vez desde un navegador normal con el botón <strong style="color:var(--tx)">🔑 Pass Ferdium</strong>.
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <div class="fo"><label>Correo</label><input type="email" id="psnEmail" placeholder="tu-correo@gmail.com" autocomplete="username"></div>
+        <div class="fo"><label>Contraseña</label><input type="password" id="psnPass" placeholder="••••••••" autocomplete="current-password"></div>
+      </div>
+      <button class="btn bp" id="btnPsnEmailLogin">→ &nbsp;Entrar con email</button>
+      <div id="psnEmailErr" style="display:none;color:var(--re);font-size:12px;margin-top:10px;font-family:var(--mo);word-break:break-word"></div>
+    </div>
   </div>
 
   <!-- Card vieja oculta: queda como compat para que el JS no truene -->
@@ -862,6 +877,27 @@ tr.d3{background:rgba(248,113,113,.04)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn bg" id="btnCancelChofer">Cancelar</button>
       <button class="btn bp" id="btnOkChofer">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PASS FERDIUM (contraseña ligada a la cuenta de Google) -->
+<div class="mb" id="modalPass">
+  <div class="md">
+    <div class="mt">🔑 Contraseña para Ferdium</div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px;line-height:1.7">
+      Crea una contraseña ligada a <strong id="passEmailLbl" style="color:var(--tx)">tu cuenta</strong>.
+      Luego podrás entrar en <strong style="color:var(--tx)">Ferdium</strong> con ese correo + contraseña y ver los
+      <strong style="color:var(--tx)">mismos datos</strong> (mismo usuario), sin pasar por el popup de Google.
+    </p>
+    <div class="fg">
+      <div class="fo full"><label>Nueva contraseña (mín. 6)</label><input type="password" id="passNew" placeholder="••••••••" autocomplete="new-password"></div>
+      <div class="fo full"><label>Repetir contraseña</label><input type="password" id="passNew2" placeholder="••••••••" autocomplete="new-password"></div>
+    </div>
+    <div id="passErr" style="display:none;color:var(--re);font-size:12px;margin:4px 0 8px;font-family:var(--mo);word-break:break-word"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn bg" id="btnCancelPass">Cancelar</button>
+      <button class="btn bp" id="btnOkPass">Guardar contraseña</button>
     </div>
   </div>
 </div>
@@ -4887,15 +4923,21 @@ function _psnUpdateUI(){
   const btnLogin = document.getElementById('btnPsnLogin');
   const btnSync = document.getElementById('btnPsnSync');
   const btnLogout = document.getElementById('btnPsnLogout');
+  const btnPass = document.getElementById('btnPassFerdium');
+  const emailBox = document.getElementById('psnEmailBox');
   if(_psnUser){
     if(btnLogin) btnLogin.style.display = 'none';
     if(btnSync) btnSync.disabled = false;
     if(btnLogout) btnLogout.style.display = 'inline-flex';
+    if(btnPass) btnPass.style.display = 'flex';   // ya logueado → puede crear su pass
+    if(emailBox) emailBox.style.display = 'none';  // ya no necesita entrar por email
     _psnSetDot('ok', `Conectado como ${_psnUser.email||_psnUser.displayName||_psnUser.uid}`);
   } else {
     if(btnLogin) btnLogin.style.display = 'inline-flex';
     if(btnSync) btnSync.disabled = true;
     if(btnLogout) btnLogout.style.display = 'none';
+    if(btnPass) btnPass.style.display = 'none';
+    if(emailBox) emailBox.style.display = 'block'; // sin sesión → ofrece login por email
     _psnSetDot('off', 'Sin sesión');
   }
 }
@@ -4910,6 +4952,9 @@ async function _psnInitFirebase(){
   try{
     _psnApp = firebase.initializeApp(PSN_CONFIG, 'personal');
     _psnAuth = _psnApp.auth();
+    // Persistencia local: mantiene la sesión entre recargas (clave en Ferdium).
+    try{ await _psnAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }
+    catch(e){ console.warn('psn persistence:', e); }
     _psnDb = _psnApp.firestore();
     _psnAuth.onAuthStateChanged(async user=>{
       _psnUser = user;
@@ -4995,6 +5040,88 @@ async function _psnLogout(){
   try{ await _psnAuth.signOut(); toast('Sesión cerrada'); }catch(e){console.error('psn logout:',e);}
 }
 
+// ── Login alternativo con EMAIL + CONTRASEÑA (funciona dentro de Ferdium) ──
+// No pasa por popup ni redirect de Google: ocurre 100% en la misma página.
+async function _psnEmailLogin(){
+  await _psnInitFirebase();
+  if(!_psnAuth){ toast('Firebase no disponible','er'); return; }
+  const email = (document.getElementById('psnEmail').value||'').trim();
+  const pass  = document.getElementById('psnPass').value||'';
+  const errEl = document.getElementById('psnEmailErr');
+  const showErr = m => { if(errEl){ errEl.style.display='block'; errEl.textContent=m; } };
+  if(errEl) errEl.style.display='none';
+  if(!email || !pass){ showErr('Escribe correo y contraseña.'); return; }
+  try{
+    _psnSetDot('sync','Iniciando sesión…');
+    await _psnAuth.signInWithEmailAndPassword(email, pass);
+    toast('✓ Sesión iniciada');
+  }catch(e){
+    console.error('psn email login:', e);
+    const code = (e && e.code) || '';
+    let msg;
+    if(code==='auth/operation-not-allowed') msg = 'Email/Password no está habilitado en Firebase (Authentication → Sign-in method).';
+    else if(code==='auth/wrong-password' || code==='auth/invalid-credential') msg = 'Contraseña incorrecta.';
+    else if(code==='auth/user-not-found') msg = 'Aún no hay contraseña para ese correo. Créala con 🔑 Pass Ferdium desde un navegador normal.';
+    else if(code==='auth/invalid-email') msg = 'Correo inválido.';
+    else if(code==='auth/too-many-requests') msg = 'Demasiados intentos. Espera un momento y reintenta.';
+    else msg = (e.message || 'Error al iniciar sesión.');
+    msg += code ? `  [${code}]` : '';
+    _psnSetDot('err', 'Error: '+msg);
+    showErr(msg);
+    toast('Error al iniciar sesión','er');
+  }
+}
+
+// Abre el modal para crear/cambiar la contraseña ligada a la cuenta de Google.
+function _psnOpenPassModal(){
+  const u = _psnAuth && _psnAuth.currentUser;
+  if(!u){ toast('Primero inicia sesión con Google','er'); return; }
+  const lbl = document.getElementById('passEmailLbl');
+  if(lbl) lbl.textContent = u.email || 'tu cuenta';
+  const err = document.getElementById('passErr'); if(err) err.style.display='none';
+  const p1 = document.getElementById('passNew'), p2 = document.getElementById('passNew2');
+  if(p1) p1.value=''; if(p2) p2.value='';
+  document.getElementById('modalPass').classList.add('on');
+}
+
+// Liga la contraseña a la cuenta ACTUAL (mismo uid, mismos datos).
+async function _psnSavePass(){
+  const u = _psnAuth && _psnAuth.currentUser;
+  const errEl = document.getElementById('passErr');
+  const showErr = m => { if(errEl){ errEl.style.display='block'; errEl.textContent=m; } };
+  if(errEl) errEl.style.display='none';
+  if(!u){ showErr('No hay sesión activa. Inicia con Google primero.'); return; }
+  const p1 = document.getElementById('passNew').value||'';
+  const p2 = document.getElementById('passNew2').value||'';
+  if(p1.length < 6){ showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if(p1 !== p2){ showErr('Las contraseñas no coinciden.'); return; }
+  try{
+    const cred = firebase.auth.EmailAuthProvider.credential(u.email, p1);
+    try{
+      await u.linkWithCredential(cred);          // primer enlace email/pass → cuenta de Google
+    }catch(e){
+      const code = (e && e.code) || '';
+      if(code==='auth/provider-already-linked' || code==='auth/email-already-in-use'){
+        await u.updatePassword(p1);              // ya estaba ligada → solo cambia la contraseña
+      } else {
+        throw e;
+      }
+    }
+    toast('✓ Contraseña lista. Úsala en Ferdium con tu correo.');
+    document.getElementById('modalPass').classList.remove('on');
+  }catch(e){
+    console.error('psn save pass:', e);
+    const code = (e && e.code) || '';
+    let msg;
+    if(code==='auth/requires-recent-login') msg = 'Por seguridad, cierra sesión y vuelve a entrar con Google, luego reintenta.';
+    else if(code==='auth/operation-not-allowed') msg = 'Habilita Email/Password en Firebase Console (Authentication → Sign-in method).';
+    else if(code==='auth/weak-password') msg = 'Contraseña muy débil (mínimo 6 caracteres).';
+    else msg = (e.message || 'No se pudo guardar la contraseña.');
+    msg += code ? `  [${code}]` : '';
+    showErr(msg);
+  }
+}
+
 async function _psnSyncSaldo(force=false){
   if(!_psnUser || !_psnDb || _psnSyncing) return;
   clearTimeout(_psnSyncTimer);
@@ -5042,6 +5169,11 @@ save = function(){
 document.getElementById('btnPsnLogin').addEventListener('click', _psnLogin);
 document.getElementById('btnPsnLogout').addEventListener('click', _psnLogout);
 document.getElementById('btnPsnSync').addEventListener('click', ()=>_psnSyncSaldo(true));
+document.getElementById('btnPsnEmailLogin').addEventListener('click', _psnEmailLogin);
+document.getElementById('psnPass').addEventListener('keydown', e=>{ if(e.key==='Enter') _psnEmailLogin(); });
+document.getElementById('btnPassFerdium').addEventListener('click', _psnOpenPassModal);
+document.getElementById('btnOkPass').addEventListener('click', _psnSavePass);
+document.getElementById('btnCancelPass').addEventListener('click', ()=>document.getElementById('modalPass').classList.remove('on'));
 
 // Inicializar al cargar (mantiene sesión persistida)
 _psnInitFirebase();
