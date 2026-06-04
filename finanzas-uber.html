@@ -805,6 +805,7 @@ tr.d3{background:rgba(248,113,113,.04)}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp" id="btnPsnLogin">🔐 &nbsp;Iniciar sesión con Google</button>
       <button class="btn bp" id="btnPsnSync" disabled>↗ &nbsp;Sincronizar saldo ahora</button>
+      <button class="btn bo" id="btnPassFerdium2" style="display:none">🔑 &nbsp;Pass Ferdium</button>
       <button class="btn bd" id="btnPsnLogout" style="display:none">✕ &nbsp;Cerrar sesión</button>
     </div>
 
@@ -4924,20 +4925,23 @@ function _psnUpdateUI(){
   const btnSync = document.getElementById('btnPsnSync');
   const btnLogout = document.getElementById('btnPsnLogout');
   const btnPass = document.getElementById('btnPassFerdium');
+  const btnPass2 = document.getElementById('btnPassFerdium2');
   const emailBox = document.getElementById('psnEmailBox');
   if(_psnUser){
     if(btnLogin) btnLogin.style.display = 'none';
     if(btnSync) btnSync.disabled = false;
     if(btnLogout) btnLogout.style.display = 'inline-flex';
-    if(btnPass) btnPass.style.display = 'flex';   // ya logueado → puede crear su pass
-    if(emailBox) emailBox.style.display = 'none';  // ya no necesita entrar por email
+    if(btnPass) btnPass.style.display = 'flex';        // ya logueado → puede crear su pass (sidebar)
+    if(btnPass2) btnPass2.style.display = 'inline-flex'; // ...y en la tarjeta de Nube
+    if(emailBox) emailBox.style.display = 'none';       // ya no necesita entrar por email
     _psnSetDot('ok', `Conectado como ${_psnUser.email||_psnUser.displayName||_psnUser.uid}`);
   } else {
     if(btnLogin) btnLogin.style.display = 'inline-flex';
     if(btnSync) btnSync.disabled = true;
     if(btnLogout) btnLogout.style.display = 'none';
     if(btnPass) btnPass.style.display = 'none';
-    if(emailBox) emailBox.style.display = 'block'; // sin sesión → ofrece login por email
+    if(btnPass2) btnPass2.style.display = 'none';
+    if(emailBox) emailBox.style.display = 'block';      // sin sesión → ofrece login por email
     _psnSetDot('off', 'Sin sesión');
   }
 }
@@ -5172,6 +5176,7 @@ document.getElementById('btnPsnSync').addEventListener('click', ()=>_psnSyncSald
 document.getElementById('btnPsnEmailLogin').addEventListener('click', _psnEmailLogin);
 document.getElementById('psnPass').addEventListener('keydown', e=>{ if(e.key==='Enter') _psnEmailLogin(); });
 document.getElementById('btnPassFerdium').addEventListener('click', _psnOpenPassModal);
+document.getElementById('btnPassFerdium2').addEventListener('click', _psnOpenPassModal);
 document.getElementById('btnOkPass').addEventListener('click', _psnSavePass);
 document.getElementById('btnCancelPass').addEventListener('click', ()=>document.getElementById('modalPass').classList.remove('on'));
 
