@@ -4956,6 +4956,10 @@ async function _psnInitFirebase(){
     try{ await _psnAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); }
     catch(e){ console.warn('psn persistence:', e); }
     _psnDb = _psnApp.firestore();
+    // Firestore rechaza valores undefined; pedimos que los ignore en vez de
+    // fallar toda la escritura (campos opcionales vacíos en autos/movs/etc).
+    try{ _psnDb.settings({ ignoreUndefinedProperties: true }); }
+    catch(e){ console.warn('psn firestore settings:', e); }
     _psnAuth.onAuthStateChanged(async user=>{
       _psnUser = user;
       _psnUpdateUI();
