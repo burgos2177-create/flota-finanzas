@@ -1548,6 +1548,17 @@ function getSaldo(autoId){
              .reduce((s,m)=>s+Number(m.monto),0);
 }
 
+// Efectivo REAL en débito de toda la flota. Suma los movimientos de débito y
+// resta sólo los PAGOS hechos a la TDC. Las compras a crédito NO bajan el
+// efectivo (son deuda hasta que se paguen desde débito).
+function saldoDebitoTotal(){
+  return MOVS.reduce((s,m)=>{
+    const monto=Number(m.monto)||0;
+    if(m.cuenta==='credito') return monto>0 ? s-monto : s; // pago→sale efectivo; compra→no toca efectivo
+    return s+monto;                                        // débito / efectivo
+  },0);
+}
+
 // Elimina un MOV y, si tenía un TDC vinculado, también lo borra ahí.
 function eliminarMovConTdc(movId){
   const mov = MOVS.find(m=>m.id===movId);
@@ -1628,7 +1639,7 @@ function renderDash(){
     d.toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
      .replace(/^\w/,c=>c.toUpperCase());
 
-  const totSaldo=AUTOS.reduce((s,a)=>s+getSaldo(a.id),0)+getSaldo('__general__');
+  const debitoTotal=saldoDebitoTotal();            // efectivo real en débito (no baja por deuda TDC)
   const activos=AUTOS.filter(a=>a.estado==='activo').length;
   const mes=new Date().toISOString().slice(0,7);
   const mm=MOVS.filter(m=>m.fecha.startsWith(mes));
@@ -1645,8 +1656,10 @@ function renderDash(){
   const tdcDisp = tcDisponible();
   const tdcPct = tcUsoPct();
   const tdcColor = tdcPct>=85?'r':tdcPct>=60?'y':'g';
+  const saldoLibre = debitoTotal - tdcDeuda;       // lo realmente disponible tras cubrir la deuda TDC
   document.getElementById('dStats').innerHTML=`
-    <div class="sc"><div class="sl">Saldo total flota</div><div class="sv ${totSaldo>=0?'g':'r'}">${fmt(totSaldo)}</div></div>
+    <div class="sc"><div class="sl">Débito total flota</div><div class="sv ${debitoTotal>=0?'g':'r'}">${fmt(debitoTotal)}</div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo);margin-top:2px">efectivo disponible</div></div>
+    <div class="sc"><div class="sl">Saldo libre</div><div class="sv ${saldoLibre>=0?'g':'r'}">${fmt(saldoLibre)}</div><div style="font-size:10px;color:var(--tx3);font-family:var(--mo);margin-top:2px">débito − deuda TDC (${fmt(tdcDeuda)})</div></div>
     <div class="sc"><div class="sl">Autos activos</div><div class="sv">${activos}/${AUTOS.length}</div></div>
     <div class="sc"><div class="sl">Ingresos este mes</div><div class="sv g">${fmt(ing)}</div></div>
     <div class="sc"><div class="sl">Egresos este mes</div><div class="sv r">${fmt(Math.abs(egr))}</div></div>
