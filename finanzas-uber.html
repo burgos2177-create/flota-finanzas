@@ -1883,27 +1883,32 @@ document.getElementById('mvFecha').addEventListener('change',()=>{
 document.getElementById('mvSemana').addEventListener('change',autoConcepto);
 document.getElementById('mvChoferAbono').addEventListener('change',updateCompletarPanel);
 
-// Reactivos para mvCuenta / mvMonto: muestra MSI cuando cuenta=credito + monto<0
+// Reactivos para mvCuenta / mvMonto: muestra MSI en cuanto se elige crédito (TDC)
 function _updateMvCuentaUI(){
   const cuenta = document.getElementById('mvCuenta').value;
   const monto = parseFloat(document.getElementById('mvMonto').value)||0;
   const hint = document.getElementById('mvCuentaHint');
   const foMsi = document.getElementById('foMvMsi');
   if(cuenta==='credito'){
-    if(monto<0){
-      foMsi.style.display='';
-      const msi = Number(document.getElementById('mvMsi').value)||1;
-      const mens = msi>1 ? `${msi} mensualidades de ${fmt(Math.abs(monto)/msi)}` : 'un solo pago';
-      hint.innerHTML = `💳 <strong>Compra con TDC</strong> — la deuda sube ${fmt(Math.abs(monto))} (${mens}). El saldo del auto refleja el gasto, pero el efectivo no se mueve.`;
-      hint.style.display='block';
-    } else if(monto>0){
+    if(monto>0){
+      // Pago a TDC desde débito — MSI no aplica a pagos
       foMsi.style.display='none';
       const deuda = tcDeudaTotal();
       hint.innerHTML = `💳 <strong>Pago a TDC</strong> (proviene de débito) — la deuda baja ${fmt(monto)} (de ${fmt(deuda)} a ${fmt(Math.max(0,deuda-monto))}). No afecta el saldo de ningún auto.`;
       hint.style.display='block';
     } else {
-      foMsi.style.display='none';
-      hint.style.display='none';
+      // Compra con TDC (gasto): mostramos MSI desde que se selecciona crédito
+      foMsi.style.display='';
+      const msi = Number(document.getElementById('mvMsi').value)||1;
+      if(monto<0){
+        const mens = msi>1 ? `${msi} mensualidades de ${fmt(Math.abs(monto)/msi)}` : 'un solo pago';
+        hint.innerHTML = `💳 <strong>Compra con TDC</strong>${msi>1?` a ${msi} MSI`:''} — la deuda sube ${fmt(Math.abs(monto))} (${mens}). El saldo del auto refleja el gasto, pero el efectivo no se mueve.`;
+      } else {
+        hint.innerHTML = msi>1
+          ? `💳 <strong>Compra a ${msi} MSI</strong> — escribe el monto del gasto en negativo (ej. −3500) para ver la mensualidad.`
+          : `💳 <strong>Compra con TDC</strong> — escribe el monto del gasto en negativo (ej. −3500). Si es a meses, elige los MSI arriba.`;
+      }
+      hint.style.display='block';
     }
   } else {
     foMsi.style.display='none';
