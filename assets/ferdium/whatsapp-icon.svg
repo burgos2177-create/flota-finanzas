@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- WhatsApp de la Flotilla · estilo WhatsApp + glifo de auto de FlotaFinanzas -->
+  <defs>
+    <linearGradient id="wbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2BD96A"/>
+      <stop offset="1" stop-color="#1AA85A"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5ef08f"/>
+      <stop offset="1" stop-color="#3fce72"/>
+    </linearGradient>
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232"/>
+    </clipPath>
+  </defs>
+
+  <!-- squircle background (verde WhatsApp) -->
+  <g clip-path="url(#squircle)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#wbg)"/>
+    <!-- brillo sutil arriba -->
+    <ellipse cx="512" cy="180" rx="620" ry="320" fill="#ffffff" fill-opacity="0.07"/>
+  </g>
+
+  <!-- burbuja de chat blanca con cola (lenguaje WhatsApp) -->
+  <path d="M512 196
+           a318 318 0 1 0 -176 583
+           L246 832
+           L386 760
+           A318 318 0 0 0 512 196 Z"
+        fill="#ffffff"/>
+
+  <!-- glifo de auto FlotaFinanzas dentro de la burbuja (reemplaza al teléfono) -->
+  <g transform="translate(514 504) scale(0.80) translate(-517 -548)">
+    <path d="M250 612
+             L250 558
+             Q250 536 272 530
+             L362 502
+             L404 426
+             Q416 402 448 402
+             L598 402
+             Q630 402 646 428
+             L692 502
+             L762 524
+             Q784 530 784 556
+             L784 612
+             Z"
+          fill="url(#car)"/>
+    <!-- ventanas grabadas (en blanco, color de la burbuja) -->
+    <path d="M428 488 L462 432 L520 432 L520 488 Z" fill="#ffffff"/>
+    <path d="M540 432 L590 432 Q606 432 614 450 L632 488 L540 488 Z" fill="#ffffff"/>
+    <!-- $ grabado en la carrocería (finanzas) -->
+    <text x="512" y="592" font-family="DejaVu Sans, Arial, sans-serif" font-size="138"
+          font-weight="800" text-anchor="middle" fill="#ffffff">$</text>
+    <!-- ruedas -->
+    <circle cx="364" cy="614" r="80" fill="url(#car)"/>
+    <circle cx="668" cy="614" r="80" fill="url(#car)"/>
+    <circle cx="364" cy="614" r="34" fill="#ffffff"/>
+    <circle cx="668" cy="614" r="34" fill="#ffffff"/>
+    <circle cx="364" cy="614" r="11" fill="#3fce72"/>
+    <circle cx="668" cy="614" r="11" fill="#3fce72"/>
+  </g>
+</svg>
